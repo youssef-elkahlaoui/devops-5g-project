@@ -1,0 +1,27 @@
+{
+  "artifact_registry": {
+    "sensitive": false,
+    "type": "string",
+    "value": "telecom-images"
+  },
+  "cloud_sql_instance": {
+    "sensitive": false,
+    "type": "string",
+    "value": "telecom5g-prod2:us-central1:telecom-postgres-prod"
+  },
+  "cloud_sql_password": {
+    "sensitive": true,
+    "type": "string",
+    "value": "WdPJavuACxfCQkU6JC5uXL0t"
+  },
+  "cluster_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "telecom-dual-stack"
+  },
+  "storage_bucket": {
+    "sensitive": false,
+    "type": "string",
+    "value": "telecom5g-prod2-telecom-backups-prod"
+  }
+}
