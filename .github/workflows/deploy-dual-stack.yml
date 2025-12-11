@@ -1,0 +1,81 @@
+name: Deploy 4G and 5G Networks
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kubernetes/**'
+      - '.github/workflows/deploy-dual-stack.yml'
+  
+  workflow_dispatch:
+
+env:
+  GCP_PROJECT_ID: 5g-telecom-prod
+  GCP_REGION: us-central1
+  CLUSTER_NAME: telecom-dual-stack
+  REGISTRY: us-central1-docker.pkg.dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Get GKE credentials
+      run: |
+        gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} \
+          --region ${{ env.GCP_REGION }} \
+          --project ${{ env.GCP_PROJECT_ID }}
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+
+    - name: Create namespaces
+      run: |
+        kubectl create namespace telecom-4g --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace telecom-5g --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Deploy 4G Network
+      run: |
+        helm repo add open5gs https://open5gs.github.io/helm-charts
+        helm repo update
+        helm install 4g-epc open5gs/open5gs \
+          --namespace telecom-4g \
+          --values kubernetes/values-4g.yaml \
+          --wait \
+          --timeout 10m
+
+    - name: Deploy 5G Network
+      run: |
+        helm install 5g-core open5gs/open5gs \
+          --namespace telecom-5g \
+          --values kubernetes/values-5g.yaml \
+          --wait \
+          --timeout 10m
+
+    - name: Verify Deployments
+      run: |
+        echo "4G Network Pods:"
+        kubectl get pods -n telecom-4g
+        echo "5G Network Pods:"
+        kubectl get pods -n telecom-5g
+
+    - name: Notify Success
+      run: echo "✅ Deployment completed successfully"
