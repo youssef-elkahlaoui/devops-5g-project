@@ -1,7 +1,7 @@
 ---
 - name: Deploy 5G Core
   hosts: control_plane
-  become: yes
+  become: true
   vars:
     control_ip: "{{ hostvars['open5gs-control']['ansible_host'] }}"
     db_ip: "{{ hostvars['open5gs-db']['ansible_host'] }}"

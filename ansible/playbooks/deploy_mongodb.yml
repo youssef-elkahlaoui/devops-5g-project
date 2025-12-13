@@ -1,7 +1,7 @@
 ---
 - name: Deploy MongoDB
   hosts: database
-  become: yes
+  become: true
   tasks:
     - name: Update apt cache
       apt:

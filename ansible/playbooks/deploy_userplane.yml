@@ -1,7 +1,7 @@
 ---
 - name: Deploy User Plane
   hosts: user_plane
-  become: yes
+  become: true
   vars:
     userplane_ip: "{{ hostvars['open5gs-userplane']['ansible_host'] }}"
   tasks:
