@@ -462,7 +462,7 @@ EOF
 
 ```bash
 cat > terraform.tfvars << 'EOF'
-project_id       = "open5gs-deployment-prod"  # Change to your project ID
+project_id       = "telecom5g-prod2"  # Change to your project ID
 region           = "us-central1"
 zone             = "us-central1-a"
 control_plane_ip = "10.10.0.2"

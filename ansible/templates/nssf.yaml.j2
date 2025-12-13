@@ -1,0 +1,14 @@
+nssf:
+  sbi:
+    server:
+      - address: {{ control_ip }}
+        port: 7777
+    client:
+      scp:
+        - uri: http://{{ control_ip }}:7777
+      nrf:
+        - uri: http://{{ control_ip }}:7777
+      nsi:
+        - uri: http://{{ control_ip }}:7777
+          s_nssai:
+            sst: 1

@@ -1,0 +1,12 @@
+pcf:
+  sbi:
+    server:
+      - address: {{ control_ip }}
+        port: 7777
+    client:
+      scp:
+        - uri: http://{{ control_ip }}:7777
+      nrf:
+        - uri: http://{{ control_ip }}:7777
+
+db_uri: mongodb://{{ db_ip }}/open5gs

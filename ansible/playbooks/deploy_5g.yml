@@ -1,0 +1,130 @@
+---
+- name: Deploy 5G Core
+  hosts: control_plane
+  become: yes
+  vars:
+    control_ip: "{{ hostvars['open5gs-control']['ansible_host'] }}"
+    db_ip: "{{ hostvars['open5gs-db']['ansible_host'] }}"
+    userplane_ip: "{{ hostvars['open5gs-userplane']['ansible_host'] }}"
+  tasks:
+    - name: Configure NRF
+      template:
+        src: ../templates/nrf.yaml.j2
+        dest: /etc/open5gs/nrf.yaml
+        backup: yes
+      notify: Restart NRF
+
+    - name: Configure AMF
+      template:
+        src: ../templates/amf.yaml.j2
+        dest: /etc/open5gs/amf.yaml
+        backup: yes
+      notify: Restart AMF
+
+    - name: Configure UDM
+      template:
+        src: ../templates/udm.yaml.j2
+        dest: /etc/open5gs/udm.yaml
+        backup: yes
+      notify: Restart UDM
+
+    - name: Configure UDR
+      template:
+        src: ../templates/udr.yaml.j2
+        dest: /etc/open5gs/udr.yaml
+        backup: yes
+      notify: Restart UDR
+
+    - name: Configure PCF
+      template:
+        src: ../templates/pcf.yaml.j2
+        dest: /etc/open5gs/pcf.yaml
+        backup: yes
+      notify: Restart PCF
+
+    - name: Configure AUSF
+      template:
+        src: ../templates/ausf.yaml.j2
+        dest: /etc/open5gs/ausf.yaml
+        backup: yes
+      notify: Restart AUSF
+
+    - name: Configure NSSF
+      template:
+        src: ../templates/nssf.yaml.j2
+        dest: /etc/open5gs/nssf.yaml
+        backup: yes
+      notify: Restart NSSF
+
+    - name: Configure BSF
+      template:
+        src: ../templates/bsf.yaml.j2
+        dest: /etc/open5gs/bsf.yaml
+        backup: yes
+      notify: Restart BSF
+
+    - name: Start NRF first
+      systemd:
+        name: open5gs-nrfd
+        state: started
+        enabled: yes
+
+    - name: Wait for NRF to be ready
+      wait_for:
+        port: 7777
+        delay: 5
+        timeout: 60
+
+    - name: Enable and start 5G services
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - open5gs-amfd
+        - open5gs-udmd
+        - open5gs-udrd
+        - open5gs-pcfd
+        - open5gs-ausfd
+        - open5gs-nssfd
+        - open5gs-bsfd
+
+    - name: Wait for AMF to be ready
+      wait_for:
+        port: 38412
+        delay: 5
+        timeout: 60
+
+  handlers:
+    - name: Restart NRF
+      systemd:
+        name: open5gs-nrfd
+        state: restarted
+    - name: Restart AMF
+      systemd:
+        name: open5gs-amfd
+        state: restarted
+    - name: Restart UDM
+      systemd:
+        name: open5gs-udmd
+        state: restarted
+    - name: Restart UDR
+      systemd:
+        name: open5gs-udrd
+        state: restarted
+    - name: Restart PCF
+      systemd:
+        name: open5gs-pcfd
+        state: restarted
+    - name: Restart AUSF
+      systemd:
+        name: open5gs-ausfd
+        state: restarted
+    - name: Restart NSSF
+      systemd:
+        name: open5gs-nssfd
+        state: restarted
+    - name: Restart BSF
+      systemd:
+        name: open5gs-bsfd
+        state: restarted

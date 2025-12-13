@@ -49,7 +49,7 @@ git --version        # Any recent version
 gcloud auth login
 
 # Create new project (or use existing)
-export PROJECT_ID="open5gs-deployment-prod"
+export PROJECT_ID="telecom5g-prod2"  # Change to your project ID
 gcloud projects create $PROJECT_ID --name="Open5GS 4G/5G Deployment"
 
 # Set as active project

@@ -43,7 +43,7 @@ gcloud compute ssh open5gs-ran --command="ls ~/UERANSIM/build/nr-gnb"
 ### 1.1 SSH into Monitoring VM
 
 ```bash
-export PROJECT_ID="open5gs-deployment-prod"
+export PROJECT_ID="telecom5g-prod2"  # Change to your project ID
 export ZONE="us-central1-a"
 
 gcloud compute ssh open5gs-monitoring --zone=$ZONE

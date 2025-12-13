@@ -1,0 +1,10 @@
+sgwc:
+  gtpc:
+    server:
+      - address: {{ control_ip }}
+  pfcp:
+    server:
+      - address: {{ control_ip }}
+    client:
+      sgwu:
+        - address: {{ userplane_ip }}

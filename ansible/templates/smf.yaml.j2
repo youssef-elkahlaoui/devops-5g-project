@@ -1,0 +1,36 @@
+smf:
+  sbi:
+    server:
+      - address: {{ control_ip }}
+        port: 7777
+    client:
+      scp:
+        - uri: http://{{ control_ip }}:7777
+      nrf:
+        - uri: http://{{ control_ip }}:7777
+  pfcp:
+    server:
+      - address: {{ control_ip }}
+    client:
+      upf:
+        - address: {{ userplane_ip }}
+  gtpc:
+    server:
+      - address: {{ control_ip }}
+  gtpu:
+    server:
+      - address: {{ control_ip }}
+  metrics:
+    server:
+      - address: {{ control_ip }}
+        port: 9090
+  session:
+    - subnet: 10.45.0.0/16
+      gateway: 10.45.0.1
+    - subnet: 10.46.0.0/16
+      gateway: 10.46.0.1
+  dns:
+    - 8.8.8.8
+    - 8.8.4.4
+  mtu: 1400
+  freeDiameter: /etc/freeDiameter/smf.conf

@@ -374,7 +374,7 @@ cd open5gs-gcp-deployment
 
 # 2. Set up GCP
 gcloud auth login
-export PROJECT_ID="your-project-id"
+export PROJECT_ID="telecom5g-prod2"  # Change to your project ID
 gcloud config set project $PROJECT_ID
 
 # 3. Follow Phase 1
