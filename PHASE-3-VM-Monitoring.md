@@ -25,16 +25,26 @@ In this phase, you will:
 
 ## ✅ Prerequisites
 
-- ✅ Phase 1 completed (Core network running)
-- ✅ Phase 2 completed (UERANSIM deployed)
-- ✅ Test subscriber added via WebUI
-- ✅ SSH access to monitoring VM
+- ✅ **Phase 1 completed** - Core network running with UERANSIM installed
+- ✅ **Phase 2 (OPTIONAL)** - DevOps automation (recommended but not required)
+- ✅ **Test subscriber added** via WebUI (imsi-999700000000002)
+- ✅ **SSH access** to monitoring VM
+
+**Verify prerequisites:**
 
 ```bash
-# Verify prerequisites
-gcloud compute ssh open5gs-control --command="systemctl is-active open5gs-amfd"
-gcloud compute ssh open5gs-ran --command="ls ~/UERANSIM/build/nr-gnb"
+# Check 5G core is running
+gcloud compute ssh open5gs-control --zone=us-central1-a --tunnel-through-iap \
+  --command "systemctl is-active open5gs-amfd open5gs-smfd"
+
+# Check UERANSIM is installed (from Phase 1 BONUS section)
+gcloud compute ssh open5gs-ran --zone=us-central1-a --tunnel-through-iap \
+  --command "ls ~/UERANSIM/build/nr-gnb"
+
+# Expected: Both commands show 'active' and UERANSIM binary exists
 ```
+
+> **Note:** UERANSIM should be installed from Phase 1 BONUS section. If you skipped it, go back to [PHASE-1-VM-Infrastructure.md](PHASE-1-VM-Infrastructure.md) and complete the BONUS section first.
 
 ---
 

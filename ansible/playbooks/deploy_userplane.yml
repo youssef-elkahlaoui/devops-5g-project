@@ -10,6 +10,32 @@
         update_cache: yes
         cache_valid_time: 3600
 
+    - name: Install prerequisites for MongoDB repository
+      apt:
+        name:
+          - gnupg
+          - curl
+        state: present
+
+    - name: Add MongoDB GPG key
+      shell: |
+        curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
+        gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+      args:
+        creates: /usr/share/keyrings/mongodb-server-8.0.gpg
+
+    - name: Add MongoDB repository
+      apt_repository:
+        repo: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse"
+        state: present
+        filename: mongodb-org-8.0
+
+    - name: Install MongoDB client tools
+      apt:
+        name: mongodb-mongosh
+        state: present
+        update_cache: yes
+
     - name: Add Open5GS PPA
       apt_repository:
         repo: ppa:open5gs/latest

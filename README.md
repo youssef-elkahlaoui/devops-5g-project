@@ -4,15 +4,61 @@
 
 ---
 
+## 📖 IMPORTANT: Main Documentation Files
+
+**Use these 3 main files only:**
+
+1. **[PHASE-1-VM-Infrastructure.md](PHASE-1-VM-Infrastructure.md)** - Complete 5G deployment guide
+2. **[PHASE-2-VM-DevOps.md](PHASE-2-VM-DevOps.md)** - DevOps layer (Option A for existing infra)
+3. **[PHASE-3-VM-Monitoring.md](PHASE-3-VM-Monitoring.md)** - Monitoring setup
+
+**Ignore these files** (they were auto-generated and their content is already in the main files):
+
+- ~~DEVOPS-RUNBOOK.md~~ (content merged into PHASE-2-VM-DevOps.md)
+- ~~README-PHASE2.md~~ (content merged into PHASE-2-VM-DevOps.md)
+- ~~PHASE2-CHANGES-SUMMARY.md~~ (not needed)
+- ~~PHASE2-QUICKSTART.md~~ (content merged into PHASE-2-VM-DevOps.md)
+- ~~QUICK-REFERENCE.md~~ (content merged into PHASE-1-VM-Infrastructure.md)
+- ~~CRITICAL-FIXES-SUMMARY.md~~ (content merged into PHASE-1-VM-Infrastructure.md)
+- ~~FREE-TIER-OPTIMIZATIONS.md~~ (content merged into README.md)
+
+---
+
 ## 🎓 QUICK START FOR ACADEMIC PROJECTS
 
-> **Only need Phase 1!** For thesis/research demonstrations, complete Phase 1 (5-6 hours) to get a working 4G/5G network. Phases 2-3 are optional extras.
+### Three-Phase Structure:
 
-| What You Need          | File to Follow                                                  |
-| ---------------------- | --------------------------------------------------------------- |
-| **Working 4G/5G Core** | [PHASE-1-VM-Infrastructure.md](PHASE-1-VM-Infrastructure.md) ✅ |
-| Automation (optional)  | [PHASE-2-VM-DevOps.md](PHASE-2-VM-DevOps.md)                    |
-| Monitoring (optional)  | [PHASE-3-VM-Monitoring.md](PHASE-3-VM-Monitoring.md)            |
+**Phase 1: Core 5G Network** ✅ REQUIRED (5-6 hours)
+
+- Deploy 5G SA Core on GCP VMs
+- Install UERANSIM for RAN simulation (BONUS section)
+- Get working internet connectivity through 5G
+- Follow: [PHASE-1-VM-Infrastructure.md](PHASE-1-VM-Infrastructure.md)
+
+**Phase 2: DevOps Automation** 🔧 OPTIONAL (2-3 hours)
+
+- Add Git version control, CI/CD pipelines, automated health checks
+- Choose Option A (DevOps layer) or Option B (Full IaC rebuild)
+- **Independent:** Can skip and go directly to Phase 3
+- Follow: [PHASE-2-VM-DevOps.md](PHASE-2-VM-DevOps.md)
+
+**Phase 3: Monitoring & Performance** 📊 OPTIONAL (2-4 hours)
+
+- Prometheus & Grafana dashboards
+- Network slicing (eMBB/URLLC), QoS testing, benchmarks
+- **Requires:** Phase 1 + BONUS (UERANSIM), Phase 2 is optional
+- Follow: [PHASE-3-VM-Monitoring.md](PHASE-3-VM-Monitoring.md)
+
+### Recommended Paths:
+
+| Your Goal                    | Path                                         | Time      |
+| ---------------------------- | -------------------------------------------- | --------- |
+| **Basic 5G demo**            | Phase 1 only                                 | 5-6 hrs   |
+| **Performance testing** ⭐   | Phase 1 + BONUS → **Skip Phase 2** → Phase 3 | 7-10 hrs  |
+| **Full DevOps experience**   | Phase 1 → Phase 2 → Phase 3                  | 10-13 hrs |
+| **Just learning automation** | Phase 1 → Phase 2 (skip Phase 3)             | 7-9 hrs   |
+
+> 💡 **Most popular path:** Phase 1 → BONUS → Phase 3 (skip Phase 2 entirely!)
 
 ---
 
@@ -365,12 +411,101 @@ open5gs-gcp-deployment/
 
 ---
 
+## � GCP Free Tier Optimizations
+
+This project is **optimized for GCP Free Trial** ($300 credit / 90 days):
+
+### Resource Usage
+
+| Resource            | Optimized Config | Quota Used          |
+| ------------------- | ---------------- | ------------------- |
+| **VM Types**        | E2/N1 standard   | ✅ Within free tier |
+| **External IPs**    | 2 of 5 VMs       | ✅ 50% of quota     |
+| **Storage (Total)** | 110GB            | ✅ Within limits    |
+| **Monthly Cost**    | ~$150            | **57% savings**     |
+
+### VM Configuration
+
+| VM                     | Type          | Internal IP | External IP | Storage | Access Method        |
+| ---------------------- | ------------- | ----------- | ----------- | ------- | -------------------- |
+| **open5gs-control**    | e2-standard-4 | 10.10.0.2   | ✅ YES      | 30GB    | Direct SSH (bastion) |
+| **open5gs-monitoring** | e2-standard-2 | 10.10.0.50  | ✅ YES      | 20GB    | Direct SSH + WebUI   |
+| **open5gs-db**         | e2-medium     | 10.10.0.4   | ❌ NO       | 20GB    | IAP tunnel           |
+| **open5gs-userplane**  | n1-standard-4 | 10.11.0.7   | ❌ NO       | 30GB    | IAP tunnel           |
+| **open5gs-ran**        | e2-standard-2 | 10.10.0.100 | ❌ NO       | 20GB    | IAP tunnel           |
+
+### SSH Access Methods
+
+**Direct Access (VMs with External IP):**
+
+```bash
+# Control Plane (bastion host)
+gcloud compute ssh open5gs-control --zone=us-central1-a
+
+# Monitoring (WebUI/Grafana)
+gcloud compute ssh open5gs-monitoring --zone=us-central1-a
+```
+
+**Internal Access (No External IP) - Use IAP Tunneling:**
+
+```bash
+# Enable IAP API first (only once)
+gcloud services enable iap.googleapis.com
+
+# Database VM
+gcloud compute ssh open5gs-db --zone=us-central1-a --tunnel-through-iap
+
+# User Plane VM
+gcloud compute ssh open5gs-userplane --zone=us-central1-a --tunnel-through-iap
+
+# RAN Simulator VM
+gcloud compute ssh open5gs-ran --zone=us-central1-a --tunnel-through-iap
+```
+
+### Cost Management Tips
+
+**Stop VMs when not testing:**
+
+```bash
+gcloud compute instances stop open5gs-control open5gs-monitoring \
+  open5gs-db open5gs-userplane open5gs-ran --zone=us-central1-a
+```
+
+**Start only when needed:**
+
+```bash
+gcloud compute instances start open5gs-control open5gs-monitoring \
+  open5gs-db open5gs-userplane open5gs-ran --zone=us-central1-a
+```
+
+**Check current costs:**
+
+```bash
+# View billing dashboard
+gcloud billing accounts list
+echo "Visit: https://console.cloud.google.com/billing"
+```
+
+### Performance vs Cost Trade-offs
+
+| Component                | Impact         | Acceptable For                      |
+| ------------------------ | -------------- | ----------------------------------- |
+| **E2 vs N2 CPUs**        | ~10% slower    | Academic projects, demos, learning  |
+| **Standard vs SSD disk** | ~2x slower I/O | Testing, validation, non-production |
+| **No external IP**       | None           | Internal communication unaffected   |
+| **Smaller disks**        | None           | 20-30GB sufficient for Open5GS      |
+
+**✅ Perfect for:** Academic projects, thesis demonstrations, 5G protocol learning, DevOps practice  
+**❌ Not for:** Production deployments, high-load stress testing, carrier-grade requirements
+
+---
+
 ## 🚀 Quick Start
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/your-repo/open5gs-gcp-deployment.git
-cd open5gs-gcp-deployment
+git clone https://github.com/youssef-elkahlaoui/devops-5g-project.git
+cd devops-5g-project
 
 # 2. Set up GCP
 gcloud auth login
@@ -389,4 +524,4 @@ gcloud config set project $PROJECT_ID
 
 ---
 
-**Last Updated**: December 13, 2025 | **Version**: 2.0.0 | **Status**: Production-Ready
+**Last Updated**: December 14, 2025 | **Version**: 2.0.0 | **Status**: Production-Ready
