@@ -409,7 +409,7 @@ amf:
     full: Open5GS Lab
 
   amf_name: open5gs-amf0
-  
+
   time:
     t3512:
       value: 540  # Required timer
@@ -1082,6 +1082,7 @@ echo "- URLLC designed for reliability (typical: 10-20 Mbps)"
 ### Error 1: Timer 3510 Expired - AMF Not Responding (NO ERROR MESSAGE)
 
 **Symptoms:**
+
 ```
 [nas] [info] UE switches to state [CM-CONNECTED]
 [nas] [debug] NAS timer[3510] expired [1]
@@ -1111,6 +1112,7 @@ Expected: `Active: active (running)` and `SCTP ... *:38412 ... open5gs-amfd`
 **Step 2: Check if SCTP packets are reaching AMF:**
 
 Terminal 1 (tcpdump):
+
 ```bash
 gcloud compute ssh open5gs-control --zone=us-central1-a --tunnel-through-iap --command="
 sudo tcpdump -i any sctp port 38412 -n -c 30
@@ -1118,6 +1120,7 @@ sudo tcpdump -i any sctp port 38412 -n -c 30
 ```
 
 Terminal 2 (start UE):
+
 ```bash
 gcloud compute ssh open5gs-ran --zone=us-central1-a --tunnel-through-iap --command="
 cd ~/UERANSIM && sudo pkill -9 nr-ue && sudo ./build/nr-ue -c config/embb-ue.yaml
@@ -1125,6 +1128,7 @@ cd ~/UERANSIM && sudo pkill -9 nr-ue && sudo ./build/nr-ue -c config/embb-ue.yam
 ```
 
 **If you see NO SCTP packets:**
+
 - Check GCP firewall rules allow ports 38412, 2152
 - Verify gNB config has correct AMF IP: `10.10.0.2`
 - Test connectivity: `ping 10.10.0.2` from RAN VM
@@ -1140,13 +1144,15 @@ sudo grep -A3 'ngap:' /etc/open5gs/amf.yaml
 ```
 
 **Must show:**
+
 ```yaml
 ngap:
   server:
-    - address: 10.10.0.2  # NOT 0.0.0.0 or 127.0.0.1!
+    - address: 10.10.0.2 # NOT 0.0.0.0 or 127.0.0.1!
 ```
 
 If wrong, fix it:
+
 ```bash
 gcloud compute ssh open5gs-control --zone=us-central1-a --tunnel-through-iap --command="
 sudo sed -i 's/address: 0.0.0.0/address: 10.10.0.2/g' /etc/open5gs/amf.yaml
@@ -1168,6 +1174,7 @@ db.getSiblingDB('open5gs').subscribers.find(
 ```
 
 **Expected (exactly ONE entry):**
+
 ```javascript
 [
   {
@@ -1182,6 +1189,7 @@ db.getSiblingDB('open5gs').subscribers.find(
 ```
 
 **If you see TWO entries or missing OPc:**
+
 - Go back to Section 2.6 and use the Direct MongoDB method
 - Delete duplicates and add complete subscriber
 
@@ -1194,6 +1202,7 @@ sudo journalctl -u open5gs-amfd -f --no-pager
 ```
 
 In another terminal, start UE. AMF **MUST** show something like:
+
 - `[amf] INFO: [imsi-999700000000001] Registration request`
 - `[amf] ERROR: Cannot find IMSI`
 - `[amf] WARNING: ...`
@@ -1224,6 +1233,7 @@ Expected: `[ngap] [info] NG Setup procedure is successful`
 ### Error 2: "PAYLOAD_NOT_FORWARDED" (Registration Failed)
 
 **Symptoms:**
+
 ```
 [nas] [error] Initial Registration failed [PAYLOAD_NOT_FORWARDED]
 [nas] [info] UE switches to state [MM-DEREGISTERED/ATTEMPTING-REGISTRATION]
@@ -1234,11 +1244,13 @@ Expected: `[ngap] [info] NG Setup procedure is successful`
 **Fix Steps:**
 
 **Step 1: SSH to control VM:**
+
 ```bash
 gcloud compute ssh open5gs-control --zone=us-central1-a --tunnel-through-iap
 ```
 
 **Step 2: Check if subscriber exists:**
+
 ```bash
 mongosh --quiet --eval "
 db.getSiblingDB('open5gs').subscribers.find(
@@ -1251,11 +1263,13 @@ db.getSiblingDB('open5gs').subscribers.find(
 **Expected:** ONE entry with K, OPc, and slice
 
 **If you see:**
+
 - **Nothing** → Subscriber doesn't exist (add it below)
 - **Two entries** → Duplicates (delete all and add one)
 - **Missing OPc** → Incomplete (delete and re-add)
 
 **Step 3: Delete any existing subscribers (if needed):**
+
 ```bash
 mongosh --quiet --eval "
 db.getSiblingDB('open5gs').subscribers.deleteMany({imsi: '999700000000001'})
@@ -1263,6 +1277,7 @@ db.getSiblingDB('open5gs').subscribers.deleteMany({imsi: '999700000000001'})
 ```
 
 **Step 4: Add complete subscriber:**
+
 ```bash
 mongosh --quiet --eval "
 db.getSiblingDB('open5gs').subscribers.insertOne({
@@ -1313,6 +1328,7 @@ db.getSiblingDB('open5gs').subscribers.insertOne({
 ```
 
 **Step 5: Verify (should return 1):**
+
 ```bash
 mongosh --quiet --eval "
 db.getSiblingDB('open5gs').subscribers.find({imsi: '999700000000001'}).count()
@@ -1320,11 +1336,13 @@ db.getSiblingDB('open5gs').subscribers.find({imsi: '999700000000001'}).count()
 ```
 
 **Step 6: Restart AMF to clear cache:**
+
 ```bash
 sudo systemctl restart open5gs-amfd
 ```
 
 **Step 7: Go back to RAN VM and retry UE:**
+
 ```bash
 exit  # Exit from control VM
 gcloud compute ssh open5gs-ran --zone=us-central1-a --tunnel-through-iap
@@ -1336,6 +1354,7 @@ sudo ./build/nr-ue -c config/embb-ue.yaml
 **Expected:** `[nas] [info] UE switches to state [MM-REGISTERED]`
 
 **Step 8: Check AMF logs if still failing:**
+
 ```bash
 # On control VM
 sudo journalctl -u open5gs-amfd -n 50 --no-pager | grep -E '999700000000001|Cannot find|Authentication|NSSAI'
@@ -1344,6 +1363,7 @@ sudo journalctl -u open5gs-amfd -n 50 --no-pager | grep -E '999700000000001|Cann
 **4. AMF-NRF Port Mismatch (CRITICAL if you changed AMF to port 7778)**
 
 **Symptoms:**
+
 ```
 [amf] ERROR: Invalid resource name [nf-instances]
 [sbi] ERROR: HTTP Response Status Code [400]
@@ -1353,6 +1373,7 @@ sudo journalctl -u open5gs-amfd -n 50 --no-pager | grep -E '999700000000001|Cann
 **Root Cause:** AMF cannot register with NRF because AMF config is pointing to wrong NRF port.
 
 **Fix:**
+
 ```bash
 # CRITICAL FIX: AMF client must point to NRF on port 7777 (not 7778!)
 gcloud compute ssh open5gs-control --zone=us-central1-a --tunnel-through-iap \
@@ -1382,12 +1403,14 @@ gcloud compute ssh open5gs-control --zone=us-central1-a --tunnel-through-iap \
 ### Error 2: "Address already in use" (Port Conflict)
 
 **Symptoms:**
+
 ```
 [gtp] [error] GTP/UDP task could not be created. Socket bind failed: Address already in use
 [rls-udp] [error] RLS failure [Socket bind failed: Address already in use]
 ```
 
 **Fix:**
+
 ```bash
 # Kill all existing UERANSIM processes
 gcloud compute ssh open5gs-ran --zone=us-central1-a --tunnel-through-iap \
@@ -1406,11 +1429,13 @@ gcloud compute ssh open5gs-ran --zone=us-central1-a --tunnel-through-iap \
 ### Error 3: "Cell barred" (gNB Not Running)
 
 **Symptoms:**
+
 ```
 [rrc] [info] Cell selection: Cell not suitable. Cell barred.
 ```
 
 **Fix:**
+
 ```bash
 # Check if gNB is running
 gcloud compute ssh open5gs-ran --zone=us-central1-a --tunnel-through-iap \
@@ -1430,10 +1455,12 @@ sudo ./build/nr-gnb -c config/open5gs-gnb.yaml
 ### Error 4: UE Connects but No Internet (No uesimtun0)
 
 **Symptoms:**
+
 - UE shows `MM-REGISTERED` but no `uesimtun0` interface
 - No PDU Session established
 
 **Fix:**
+
 ```bash
 # Check if PDU session was established
 gcloud compute ssh open5gs-ran --zone=us-central1-a --tunnel-through-iap \
