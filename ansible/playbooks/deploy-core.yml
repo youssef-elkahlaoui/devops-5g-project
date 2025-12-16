@@ -114,7 +114,7 @@
       file:
         path: /etc/iptables
         state: directory
-        mode: '0755'
+        mode: "0755"
       ignore_errors: yes
 
     - name: Save iptables rules
@@ -150,7 +150,7 @@
       retries: 3
       delay: 5
 
-    - name: Install Prometheus
+    - name: Install Prometheus (optional for monitoring)
       apt:
         name: prometheus
         state: present
@@ -158,12 +158,14 @@
       until: apt_result is succeeded
       retries: 3
       delay: 10
+      ignore_errors: yes
 
-    - name: Start Prometheus
+    - name: Start Prometheus (optional - may fail if config is invalid)
       systemd:
         name: prometheus
         state: started
         enabled: yes
+      ignore_errors: yes
 
     - name: Display Open5GS status
       shell: systemctl status open5gs-amf --no-pager
