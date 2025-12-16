@@ -3,15 +3,52 @@
   hosts: control_plane
   become: true
   tasks:
+    - name: Fix DNS resolution
+      shell: |
+        echo "nameserver 8.8.8.8" | tee /etc/resolv.conf > /dev/null
+        echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+
     - name: Update system packages
       apt:
         update_cache: yes
         upgrade: dist
+      register: apt_result
+      until: apt_result is succeeded
+      retries: 3
+      delay: 10
+
+    - name: Install required packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - gnupg
+        - curl
+        - wget
+        - software-properties-common
+      register: apt_result
+      until: apt_result is succeeded
+      retries: 3
+      delay: 10
+
+    - name: Add MongoDB GPG key
+      shell: curl -fsSL https://www.mongodb.org/static/pgp/server-5.0.asc | apt-key add -
+      ignore_errors: yes
+
+    - name: Add MongoDB repository
+      apt_repository:
+        repo: deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/5.0 multiverse
+        state: present
+        filename: mongodb-org-5.0
 
     - name: Install MongoDB
       apt:
-        name: mongodb
+        name: mongodb-org
         state: present
+      register: apt_result
+      until: apt_result is succeeded
+      retries: 3
+      delay: 10
 
     - name: Add Open5GS PPA
       apt_repository:
@@ -32,6 +69,10 @@
         - open5gs-pcf
         - open5gs-ausf
         - open5gs-webui
+      register: apt_result
+      until: apt_result is succeeded
+      retries: 3
+      delay: 10
 
     - name: Enable IP forwarding (critical for NAT)
       sysctl:
@@ -40,11 +81,24 @@
         sysctl_set: yes
 
     - name: Configure NAT masquerading for UE subnet
-      iptables:
-        table: nat
-        chain: POSTROUTING
-        source: 10.45.0.0/16
-        jump: MASQUERADE
+      shell: |
+        iptables -t nat -A POSTROUTING -s 10.45.0.0/16 -j MASQUERADE
+        iptables -t nat -A POSTROUTING -s 10.46.0.0/16 -j MASQUERADE
+      ignore_errors: yes
+
+    - name: Save iptables rules
+      shell: iptables-save > /etc/iptables/rules.v4
+      ignore_errors: yes
+
+    - name: Start MongoDB
+      systemd:
+        name: mongod
+        state: started
+        enabled: yes
+      register: mongodb_result
+      until: mongodb_result is succeeded
+      retries: 3
+      delay: 5
 
     - name: Start Open5GS services
       systemd:
@@ -60,20 +114,30 @@
         - udr
         - pcf
         - ausf
-
-    - name: Start MongoDB
-      systemd:
-        name: mongodb
-        state: started
-        enabled: yes
+      register: service_result
+      until: service_result is succeeded
+      retries: 3
+      delay: 5
 
     - name: Install Prometheus
       apt:
         name: prometheus
         state: present
+      register: apt_result
+      until: apt_result is succeeded
+      retries: 3
+      delay: 10
 
     - name: Start Prometheus
       systemd:
         name: prometheus
         state: started
         enabled: yes
+
+    - name: Display Open5GS status
+      shell: systemctl status open5gs-amf --no-pager
+      ignore_errors: yes
+
+    - name: Configuration complete
+      debug:
+        msg: "Open5GS core deployment completed. Services: NRF, AMF, SMF, UPF, UDM, UDR, PCF, AUSF"
