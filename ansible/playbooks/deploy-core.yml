@@ -31,15 +31,26 @@
       retries: 3
       delay: 10
 
-    - name: Add MongoDB GPG key
-      shell: curl -fsSL https://www.mongodb.org/static/pgp/server-5.0.asc | apt-key add -
+    - name: Add MongoDB GPG key (modern approach)
+      shell: |
+        curl -fsSL https://www.mongodb.org/static/pgp/server-5.0.asc | \
+        gpg --dearmor | \
+        tee /usr/share/keyrings/mongodb-server-5.0.gpg > /dev/null
       ignore_errors: yes
 
     - name: Add MongoDB repository
       apt_repository:
-        repo: deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/5.0 multiverse
+        repo: deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-5.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/5.0 multiverse
         state: present
         filename: mongodb-org-5.0
+
+    - name: Update apt cache after MongoDB repository
+      apt:
+        update_cache: yes
+      register: apt_result
+      until: apt_result is succeeded
+      retries: 3
+      delay: 10
 
     - name: Install MongoDB
       apt:
