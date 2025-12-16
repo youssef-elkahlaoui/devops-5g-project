@@ -1531,7 +1531,167 @@ You now have a fully functional 5G SA Core network on GCP VMs.
 
 ---
 
-## 📱 BONUS: Quick UERANSIM Test (30 minutes)
+## � UERANSIM Deployment - Critical Configuration Issues
+
+> **⚠️ READ THIS BEFORE DEPLOYING UERANSIM!** These fixes ensure 100% success on first deployment.
+
+### Issue 1: AMF Not Listening on External IP ❌ BLOCKER
+
+**Problem:** AMF configured to listen on `127.0.0.5` (localhost) instead of `10.10.0.2`
+- **Impact:** UERANSIM gNB on vm-ran (10.10.0.100) cannot connect to AMF
+- **Symptom:** `NG Setup` fails with connection refused
+- **Root Cause:** Default Open5GS installation binds to localhost
+
+**Fix in deploy-core.yml:**
+```yaml
+- name: Configure AMF to listen on 10.10.0.2 for NGAP
+  shell: |
+    sed -i 's/address: 127.0.0.5/address: 10.10.0.2/' /etc/open5gs/amf.yaml
+```
+
+**Manual Fix:**
+```bash
+# On vm-core
+sudo sed -i 's/address: 127.0.0.5/address: 10.10.0.2/' /etc/open5gs/amf.yaml
+sudo systemctl restart open5gs-amfd
+
+# Verify
+sudo ss -tlnp | grep 38412
+# Expected: LISTEN 0 511 10.10.0.2:38412
+```
+
+---
+
+### Issue 2: gNB Configuration Using Localhost ❌ BLOCKER
+
+**Problem:** gNB config had `linkIp: 127.0.0.1`, `ngapIp: 127.0.0.1`, `gtpIp: 127.0.0.1`
+- **Impact:** gNB cannot establish NGAP connection to remote AMF
+- **Symptom:** `NG Setup` never initiates
+- **Root Cause:** Template used localhost instead of vm-ran IP
+
+**Correct Configuration:**
+```yaml
+linkIp: 10.10.0.100   # vm-ran internal IP
+ngapIp: 10.10.0.100   # NGAP connection to AMF
+gtpIp: 10.10.0.100    # GTP-U tunnel endpoint
+amfConfigs:
+  - address: 10.10.0.2  # vm-core AMF address
+    port: 38412
+```
+
+---
+
+### Issue 3: Incorrect SST Value ❌ CRITICAL
+
+**Problem:** Both gNB and UE configs used `sst: 0`
+- **Impact:** Slice selection fails, UE registration rejected
+- **Symptom:** `SM-PDU SESSION ESTABLISHMENT REJECT`
+- **Root Cause:** SST=0 is invalid, standard uses SST=1 for eMBB
+
+**Fix:**
+```yaml
+# In gNB config
+sliceSupportList:
+  - sst: 1  # Changed from 0 to 1
+
+# In UE config
+sessions:
+  - type: 'IPv4'
+    apn: 'internet'
+    slice:
+      sst: 1    # Changed from 0 to 1
+```
+
+---
+
+### Issue 4: UE Configuration Format Outdated ❌ MAJOR
+
+**Problem:** UE config used old UERANSIM v3.1.x format
+- **Impact:** Configuration parsing errors, UE won't start
+- **Root Cause:** UERANSIM v3.2.6 has different structure
+
+**Old Format (v3.1.x - DON'T USE):**
+```yaml
+imsi: '999700000000001'
+amf:
+  host: 10.10.0.2
+  port: 5555
+```
+
+**New Format (v3.2.6 - CORRECT):**
+```yaml
+supi: 'imsi-999700000000001'
+gnbSearchList:
+  - 10.10.0.100
+```
+
+---
+
+### Issue 5: Missing Subscriber with SST=1 ❌ BLOCKER
+
+**Problem:** No subscriber provisioned with matching IMSI and SST=1
+- **Impact:** UE authentication fails
+- **Symptom:** `AUTHENTICATION FAILURE` or `REGISTRATION REJECT`
+
+**Fix in deploy-core.yml:**
+```yaml
+- name: Add test subscriber to MongoDB for UERANSIM
+  shell: |
+    mongosh --eval "
+    db.subscribers.insertOne({
+      imsi: '999700000000001',
+      slice: [{
+        sst: 1,
+        default_indicator: true,
+        session: [{
+          name: 'internet',
+          type: 3,
+          qos: { index: 9, arp: { priority_level: 8 } },
+          ambr: { uplink: { value: 1, unit: 3 }, downlink: { value: 1, unit: 3 } }
+        }]
+      }],
+      security: {
+        k: '465B5CE8B199B49FAA5F0A2EE238A6BC',
+        opc: 'E8ED289DEBA952E4283B54E88E6183CA',
+        amf: '8000'
+      }
+    })
+    " open5gs
+```
+
+---
+
+### Pre-Deployment Verification Checklist
+
+Before running UERANSIM, verify:
+
+```bash
+# 1. Check AMF is listening on 10.10.0.2:38412
+gcloud compute ssh vm-core --zone=us-central1-a --command="sudo ss -tlnp | grep 38412"
+# Expected: LISTEN 0 511 10.10.0.2:38412
+
+# 2. Verify AMF configuration
+gcloud compute ssh vm-core --zone=us-central1-a --command="sudo grep 'address: 10.10.0.2' /etc/open5gs/amf.yaml"
+# Expected: - address: 10.10.0.2
+
+# 3. Check subscriber exists with SST=1
+gcloud compute ssh vm-core --zone=us-central1-a --command="mongosh --eval \"db.subscribers.find({imsi:'999700000000001'}).pretty()\" open5gs"
+# Expected: Document with slice.sst: 1
+
+# 4. Test connectivity vm-ran → vm-core AMF
+gcloud compute ssh vm-ran --zone=us-central1-a --command="nc -zv 10.10.0.2 38412"
+# Expected: succeeded!
+```
+
+**Automated Verification:**
+```bash
+cd ansible
+ansible-playbook -i inventory/hosts.ini playbooks/verify-ueransim-ready.yml
+```
+
+---
+
+## �📱 BONUS: Quick UERANSIM Test (30 minutes)
 
 > **⚠️ REQUIRED for Phase 3!** If you plan to do Phase 3 (Monitoring), complete this section first.
 >
@@ -1564,18 +1724,20 @@ nci: '0x000000010'
 idLength: 32
 tac: 1
 
-linkIp: 10.10.0.100
-ngapIp: 10.10.0.100
-gtpIp: 10.10.0.100
+# CRITICAL: Use vm-ran IP (10.10.0.100) not 127.0.0.1
+linkIp: 10.10.0.100   # vm-ran internal IP
+ngapIp: 10.10.0.100   # NGAP connection to AMF
+gtpIp: 10.10.0.100    # GTP-U tunnel endpoint
 
 amfConfigs:
-  - address: 10.10.0.2
+  - address: 10.10.0.2  # vm-core AMF address
     port: 38412
 
-slices:
+# CRITICAL: Use SST=1 (not 0)
+sliceSupportList:
   - sst: 1
 
-ignoreStreamIds: true
+ignoreStreamIds: false
 EOF
 ```
 

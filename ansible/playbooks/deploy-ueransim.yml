@@ -61,6 +61,19 @@
       debug:
         msg: "UERANSIM build completed with exit code: {{ build_result.rc }}"
 
+    - name: Verify UERANSIM executables were built
+      stat:
+        path: "/home/ubuntu/UERANSIM/build/{{ item }}"
+      loop:
+        - nr-gnb
+        - nr-ue
+      register: binary_check
+
+    - name: Display binary check results
+      debug:
+        msg: "{{ item.item }} exists: {{ item.stat.exists }}"
+      loop: "{{ binary_check.results }}"
+
     - name: Create UERANSIM config directory
       file:
         path: /home/ubuntu/UERANSIM/config
@@ -84,14 +97,15 @@
           mnc: '70'
           nci: '0x000000010'
           idLength: 32
-          linkIp: 127.0.0.1
-          ngapIp: 127.0.0.1
-          gtpIp: 127.0.0.1
+          tac: 1
+          linkIp: 10.10.0.100   # vm-ran internal IP
+          ngapIp: 10.10.0.100   # NGAP connection to AMF
+          gtpIp: 10.10.0.100    # GTP-U tunnel endpoint
           amfConfigs:
-            - address: 10.10.0.2
+            - address: 10.10.0.2  # vm-core AMF address
               port: 38412
           sliceSupportList:
-            - sst: 0
+            - sst: 1              # SST=1 is standard (not 0)
           ignoreStreamIds: false
         owner: ubuntu
         group: ubuntu
@@ -101,26 +115,72 @@
       copy:
         dest: /home/ubuntu/UERANSIM/config/open5gs-ue.yaml
         content: |
-          test: true
-          trackingAreaCode: '0x0001'
-          keyResourceSetId: 0
+          # [Mandatory]
+          supi: 'imsi-999700000000001'
+          mcc: '999'
+          mnc: '70'
+          routingIndicator: '0000'
+
+          # [Mandatory]
           key: '465B5CE8B199B49FAA5F0A2EE238A6BC'
           op: 'E8ED289DEBA952E4283B54E88E6183CA'
-          amf:
-            host: 10.10.0.2
-            port: 5555
-          imsi: '999700000000001'
+          opType: 'OPC'
+          amf: '8000'
+
+          # [Optional]
           imei: '356938035643803'
-          imeiSv: '4105198890011101'
-          sliceConfigs:
-            - sst: 0
-          defaultAs: '127.0.0.1'
-          configureRouting: true
+          imeiSv: '4370816125816151'
+
+          # [Mandatory]
+          gnbSearchList:
+            - 10.10.0.100
+
+          # [Optional]
+          sessions:
+            - type: 'IPv4'
+              apn: 'internet'
+              slice:
+                sst: 1
+
+          # [Optional]
+          configured-nssai:
+            - sst: 1
+
+          # [Optional]
+          default-nssai:
+            - sst: 1
+
+          # [Optional]
+          integrity:
+            IA1: true
+            IA2: true
+            IA3: true
+
+          # [Optional]
+          ciphering:
+            EA1: true
+            EA2: true
+            EA3: true
         owner: ubuntu
         group: ubuntu
         mode: "0644"
 
     - name: UERANSIM deployment complete
       debug:
-        msg: "UERANSIM ready at /home/ubuntu/UERANSIM. Run: cd UERANSIM && ./nr-gnb -c config/open5gs-gnb.yaml"
-        recurse: yes
+        msg: |
+          ====================================
+          UERANSIM Deployment Complete!
+          ====================================
+          Location: /home/ubuntu/UERANSIM
+
+          To test gNB:
+            cd /home/ubuntu/UERANSIM
+            sudo ./build/nr-gnb -c config/open5gs-gnb.yaml
+
+          To test UE (in another terminal):
+            cd /home/ubuntu/UERANSIM
+            sudo ./build/nr-ue -c config/open5gs-ue.yaml
+
+          Expected: 'NG Setup procedure is successful' (gNB)
+          Expected: 'MM-REGISTERED/NORMAL-SERVICE' (UE)
+          ====================================

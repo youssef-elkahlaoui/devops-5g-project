@@ -145,6 +145,60 @@
       retries: 3
       delay: 5
 
+    # CRITICAL: Configure AMF to listen on actual IP (10.10.0.2) instead of localhost
+    # This allows UERANSIM gNB to connect via NGAP on port 38412
+    - name: Configure AMF to listen on 10.10.0.2 for NGAP
+      shell: |
+        sed -i 's/address: 127.0.0.5/address: 10.10.0.2/' /etc/open5gs/amf.yaml
+      ignore_errors: yes
+
+    - name: Configure SMF address for UPF association
+      shell: |
+        sed -i 's/addr: 127.0.0.4/addr: 10.10.0.2/' /etc/open5gs/smf.yaml
+      ignore_errors: yes
+
+    - name: Add test subscriber to MongoDB for UERANSIM
+      shell: |
+        mongosh --eval "
+        db.subscribers.insertOne({
+          imsi: '999700000000001',
+          subscribed_rau_tau_timer: 12,
+          network_access_mode: 0,
+          subscriber_status: 0,
+          access_restriction_data: 32,
+          slice: [{
+            sst: 1,
+            default_indicator: true,
+            session: [{
+              name: 'internet',
+              type: 3,
+              qos: {
+                index: 9,
+                arp: { priority_level: 8, pre_emption_capability: 1, pre_emption_vulnerability: 1 }
+              },
+              ambr: { uplink: { value: 1, unit: 3 }, downlink: { value: 1, unit: 3 } },
+              pcc_rule: []
+            }]
+          }],
+          ambr: { uplink: { value: 1, unit: 3 }, downlink: { value: 1, unit: 3 } },
+          security: {
+            k: '465B5CE8B199B49FAA5F0A2EE238A6BC',
+            amf: '8000',
+            op: null,
+            opc: 'E8ED289DEBA952E4283B54E88E6183CA'
+          },
+          schema_version: 1,
+          __v: 0
+        })
+        " open5gs
+      ignore_errors: yes
+      register: subscriber_result
+
+    - name: Display subscriber creation result
+      debug:
+        msg: "Subscriber added: {{ subscriber_result.stdout_lines }}"
+      ignore_errors: yes
+
     - name: Start Open5GS services
       systemd:
         name: open5gs-{{ item }}d

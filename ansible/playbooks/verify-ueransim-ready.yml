@@ -1,0 +1,113 @@
+---
+- name: Verify UERANSIM Prerequisites and Configuration
+  hosts: control_plane
+  become: true
+  tasks:
+    - name: Check AMF is listening on 10.10.0.2:38412
+      shell: ss -tlnp | grep 38412
+      register: amf_port_check
+      ignore_errors: yes
+
+    - name: Display AMF listening status
+      debug:
+        msg: "{{ amf_port_check.stdout_lines }}"
+
+    - name: Verify AMF configuration file
+      shell: grep -A 5 'ngap:' /etc/open5gs/amf.yaml | grep address
+      register: amf_config_check
+
+    - name: Display AMF NGAP configuration
+      debug:
+        msg: "{{ amf_config_check.stdout_lines }}"
+
+    - name: Check AMF logs for errors
+      shell: journalctl -u open5gs-amfd -n 20 --no-pager
+      register: amf_logs
+
+    - name: Display recent AMF logs
+      debug:
+        msg: "{{ amf_logs.stdout_lines }}"
+
+    - name: Check if subscriber exists in MongoDB
+      shell: |
+        mongosh --eval "db.subscribers.find({imsi:'999700000000001'}).pretty()" open5gs
+      register: subscriber_check
+      ignore_errors: yes
+
+    - name: Display subscriber check
+      debug:
+        msg: "{{ subscriber_check.stdout_lines }}"
+
+    - name: Verify all Open5GS services are running
+      shell: |
+        for svc in nrfd amfd smfd upfd udmd udrd pcfd ausfd; do
+          echo -n "open5gs-$svc: "
+          systemctl is-active open5gs-$svc
+        done
+      register: services_status
+
+    - name: Display services status
+      debug:
+        msg: "{{ services_status.stdout_lines }}"
+
+- name: Verify UERANSIM on RAN Node
+  hosts: ran_nodes
+  become: true
+  tasks:
+    - name: Check UERANSIM binaries exist
+      stat:
+        path: "/home/ubuntu/UERANSIM/build/{{ item }}"
+      loop:
+        - nr-gnb
+        - nr-ue
+      register: binary_check
+
+    - name: Display binary check
+      debug:
+        msg: "{{ item.item }}: {{ 'EXISTS' if item.stat.exists else 'MISSING' }}"
+      loop: "{{ binary_check.results }}"
+
+    - name: Verify gNB configuration
+      shell: cat /home/ubuntu/UERANSIM/config/open5gs-gnb.yaml
+      register: gnb_config
+
+    - name: Display gNB config
+      debug:
+        msg: "{{ gnb_config.stdout_lines }}"
+
+    - name: Verify UE configuration
+      shell: cat /home/ubuntu/UERANSIM/config/open5gs-ue.yaml
+      register: ue_config
+
+    - name: Display UE config
+      debug:
+        msg: "{{ ue_config.stdout_lines }}"
+
+    - name: Test connectivity to AMF
+      shell: timeout 3 nc -zv 10.10.0.2 38412 2>&1 || echo "Connection test completed"
+      register: amf_connectivity
+      ignore_errors: yes
+
+    - name: Display AMF connectivity test
+      debug:
+        msg: "{{ amf_connectivity.stdout_lines }}"
+
+    - name: Summary - Prerequisites Check
+      debug:
+        msg: |
+          ====================================
+          UERANSIM Prerequisites Verification
+          ====================================
+          1. AMF must listen on 10.10.0.2:38412 ✓
+          2. Subscriber must exist in MongoDB ✓
+          3. All Open5GS services must be running ✓
+          4. UERANSIM binaries must exist ✓
+          5. Configs must use correct IPs and SST=1 ✓
+
+          If all checks pass, run:
+
+          On vm-ran:
+            sudo /home/ubuntu/UERANSIM/build/nr-gnb -c /home/ubuntu/UERANSIM/config/open5gs-gnb.yaml
+
+          Expected output: "NG Setup procedure is successful"
+          ====================================

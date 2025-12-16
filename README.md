@@ -9,9 +9,11 @@
 
 ## 🚀 Quick Start
 
-For complete step-by-step deployment instructions (VMs, Terraform, Ansible), see [PHASE-1-VM-Infrastructure-Deployment.md](PHASE-1-VM-Infrastructure-Deployment.md)
+For complete step-by-step deployment with UERANSIM fixes, see [PHASE-1-VM-Infrastructure.md](PHASE-1-VM-Infrastructure.md)
 
-For testing and benchmarking after deployment, see [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md)
+For DevOps automation, see [PHASE-2-VM-DevOps.md](PHASE-2-VM-DevOps.md)
+
+For monitoring setup, see [PHASE-3-VM-Monitoring.md](PHASE-3-VM-Monitoring.md)
 
 ### Step 1: Provision Infrastructure with Terraform
 
