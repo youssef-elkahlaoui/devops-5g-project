@@ -9,7 +9,9 @@
 
 ## 🚀 Quick Start
 
-For complete step-by-step deployment instructions, SSH setup, and troubleshooting, see [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md#-deployment-section)
+For complete step-by-step deployment instructions (VMs, Terraform, Ansible), see [PHASE-1-VM-Infrastructure-Deployment.md](PHASE-1-VM-Infrastructure-Deployment.md)
+
+For testing and benchmarking after deployment, see [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md)
 
 ### Step 1: Provision Infrastructure with Terraform
 
@@ -64,24 +66,24 @@ bash ../scripts/test-connectivity.sh
 
 ```
 devops-5g-project/
-├── terraform/                          # Infrastructure as Code
-│   ├── main.tf                        # VPC, subnets, firewall, VMs
-│   ├── variables.tf                   # Input variables
-│   └── outputs.tf                     # Deployment outputs
-├── ansible/                           # Configuration Management
-│   ├── ansible.cfg                    # Ansible configuration
+├── terraform/                                # Infrastructure as Code
+│   ├── main.tf                              # VPC, subnets, firewall, VMs
+│   ├── variables.tf                         # Input variables
+│   └── outputs.tf                           # Deployment outputs
+├── ansible/                                 # Configuration Management
+│   ├── ansible.cfg                          # Ansible configuration
 │   ├── inventory/
-│   │   └── hosts.ini                  # Managed hosts (control_plane, ran_nodes)
+│   │   └── hosts.ini                        # Managed hosts
 │   └── playbooks/
-├── scripts/                           # Test and utility scripts
-│   └── test-connectivity.sh           # 5G connectivity verification
-└── Documentation/
-    ├── README.md                      # This file (quick reference)
-    ├── PHASE-1-Infrastructure-Config.md
-    ├── PHASE-2-Testing-Benchmarking.md    # ⭐ Complete deployment guide
-    ├── PHASE-3-VM-Monitoring.md
-    ├── WORKING-CONFIG-REFERENCE.md
-    └── CLEANUP-OLD-VMS.md
+│       ├── deploy-core.yml                  # Open5GS deployment
+│       └── deploy-ueransim.yml              # UERANSIM deployment
+├── scripts/                                 # Test and utility scripts
+│   └── test-connectivity.sh                 # 5G connectivity verification
+├── PHASE-1-VM-Infrastructure-Deployment.md  # ⭐ Main deployment guide
+├── PHASE-2-Testing-Benchmarking.md          # Testing & benchmarking
+├── WORKING-CONFIG-REFERENCE.md              # Configuration reference
+├── CLEANUP-OLD-VMS.md                       # Resource cleanup
+└── README.md                                # This file
 ```
 
 ---
@@ -90,8 +92,8 @@ devops-5g-project/
 
 | Document | Purpose |
 |----------|---------|
-| [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md) | **⭐ Complete deployment guide with SSH setup, Ansible playbooks, configuration tables, and troubleshooting** |
-| [PHASE-1-Infrastructure-Config.md](PHASE-1-Infrastructure-Config.md) | 5G network configuration reference |
+| [PHASE-1-VM-Infrastructure-Deployment.md](PHASE-1-VM-Infrastructure-Deployment.md) | **⭐ VM preparation, Terraform infrastructure provisioning, Ansible setup, Open5GS/UERANSIM deployment** |
+| [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md) | Testing, benchmarking, performance comparison of 4G vs 5G |
 | [WORKING-CONFIG-REFERENCE.md](WORKING-CONFIG-REFERENCE.md) | Verified 5G configuration (PLMN 999/70, IMSI, security keys) |
 | [CLEANUP-OLD-VMS.md](CLEANUP-OLD-VMS.md) | Steps to clean up old GCP resources |
 
@@ -111,15 +113,15 @@ devops-5g-project/
 
 ## 🔧 Technology Stack
 
-| Component | Version | Purpose |
-|-----------|---------|---------|
-| **Terraform** | 1.x | Infrastructure provisioning |
-| **GCP** | latest | Cloud platform (e2-medium VMs, 4GB RAM each) |
-| **Ubuntu** | 22.04 | Base OS for both VMs |
-| **Ansible** | 2.10+ | Configuration management |
-| **Open5GS** | Latest | 5G core network components |
-| **UERANSIM** | v3.2.6 | 5G RAN simulator (gNB + UE) |
-| **MongoDB** | Latest | Open5GS subscriber database |
+| Component     | Version | Purpose                                      |
+| ------------- | ------- | -------------------------------------------- |
+| **Terraform** | 1.x     | Infrastructure provisioning                  |
+| **GCP**       | latest  | Cloud platform (e2-medium VMs, 4GB RAM each) |
+| **Ubuntu**    | 22.04   | Base OS for both VMs                         |
+| **Ansible**   | 2.10+   | Configuration management                     |
+| **Open5GS**   | Latest  | 5G core network components                   |
+| **UERANSIM**  | v3.2.6  | 5G RAN simulator (gNB + UE)                  |
+| **MongoDB**   | Latest  | Open5GS subscriber database                  |
 
 ---
 
@@ -176,7 +178,7 @@ devops-5g-project/
 PLMN:
   MCC: 999
   MNC: 70
-  SST: 0  # Slice Service Type
+  SST: 0 # Slice Service Type
 
 IMSI: 999700000000001
 
@@ -192,7 +194,7 @@ Security:
 resource "google_compute_instance" "core" {
   name         = "vm-core"
   machine_type = "e2-medium"
-  
+
   network_interface {
     network_ip = "10.10.0.2"
     network    = google_compute_network.vpc.id
@@ -214,7 +216,9 @@ resource "google_compute_instance" "core" {
 
 ## 🆘 Support
 
-For **complete deployment instructions, SSH troubleshooting, and detailed configuration**, see [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md).
+For **complete deployment instructions**, see [PHASE-1-VM-Infrastructure-Deployment.md](PHASE-1-VM-Infrastructure-Deployment.md).
+
+For **testing and benchmarking**, see [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md).
 
 For **5G network configuration reference**, see [WORKING-CONFIG-REFERENCE.md](WORKING-CONFIG-REFERENCE.md).
 
@@ -222,16 +226,17 @@ For **5G network configuration reference**, see [WORKING-CONFIG-REFERENCE.md](WO
 
 **Last Updated:** December 16, 2025  
 **Status:** ✅ Production-Ready | All components deployed and tested
-│       ├── deploy-core.yml            # Open5GS 5G core deployment
-│       └── deploy-ueransim.yml        # UERANSIM RAN simulator compilation
-├── scripts/                           # Testing & utilities
-│   └── test-connectivity.sh           # Verify 5G UE attachment
-├── CLEANUP-OLD-VMS.md                 # Guide to cleanup old resources
-├── PHASE-1-Infrastructure-Config.md   # Detailed setup guide
-├── PHASE-2-Testing-Benchmarking.md    # Performance benchmarking
+│ ├── deploy-core.yml # Open5GS 5G core deployment
+│ └── deploy-ueransim.yml # UERANSIM RAN simulator compilation
+├── scripts/ # Testing & utilities
+│ └── test-connectivity.sh # Verify 5G UE attachment
+├── CLEANUP-OLD-VMS.md # Guide to cleanup old resources
+├── PHASE-1-Infrastructure-Config.md # Detailed setup guide
+├── PHASE-2-Testing-Benchmarking.md # Performance benchmarking
 
-├── WORKING-CONFIG-REFERENCE.md        # All configuration details
-└── README.md                          # This file
+├── WORKING-CONFIG-REFERENCE.md # All configuration details
+└── README.md # This file
+
 ```
 
 ---
@@ -277,34 +282,36 @@ The result is a scientific comparison proving why 5G is fundamentally suited for
 ### Two-Tier Separation of Duties
 
 ```
+
 ┌────────────────────────────────────────────────────────────────────┐
-│             Google Cloud Platform (us-central1-a)                 │
+│ Google Cloud Platform (us-central1-a) │
 ├────────────────────────────────────────────────────────────────────┤
-│                                                                    │
-│  THE "BRAIN" (vm-core)    THE "EDGE" (vm-ran)                   │
-│  ─────────────────────────  ────────────────────                 │
-│  e2-medium (2vCPU/4GB)    e2-medium (2vCPU/4GB)                 │
-│  10.10.0.2                10.10.0.100                            │
-│                                                                    │
-│  Control Plane:           RAN Simulators:                        │
-│  • NRF (Discovery)        • srsRAN v22 (4G eNB+UE)              │
-│  • AMF (Access Mgmt)      • UERANSIM v3.2 (5G gNB+UE)           │
-│  • SMF (Session Mgmt)     • ZMQ mode (virtual antenna)           │
-│  • UDM, UDR, PCF, AUSF                                          │
-│  • UPF (User Plane)       Simulates backhaul latency            │
-│                                                                    │
-│  Database:                Observability:                         │
-│  • MongoDB (subscribers)  • Node Exporter (metrics)             │
-│  • Observability:         • Prometheus (scrape)                 │
-│  • Prometheus (metrics)   • Grafana (visualization)             │
-│  • Grafana (dashboards)                                         │
-│                                                                    │
+│ │
+│ THE "BRAIN" (vm-core) THE "EDGE" (vm-ran) │
+│ ───────────────────────── ──────────────────── │
+│ e2-medium (2vCPU/4GB) e2-medium (2vCPU/4GB) │
+│ 10.10.0.2 10.10.0.100 │
+│ │
+│ Control Plane: RAN Simulators: │
+│ • NRF (Discovery) • srsRAN v22 (4G eNB+UE) │
+│ • AMF (Access Mgmt) • UERANSIM v3.2 (5G gNB+UE) │
+│ • SMF (Session Mgmt) • ZMQ mode (virtual antenna) │
+│ • UDM, UDR, PCF, AUSF │
+│ • UPF (User Plane) Simulates backhaul latency │
+│ │
+│ Database: Observability: │
+│ • MongoDB (subscribers) • Node Exporter (metrics) │
+│ • Observability: • Prometheus (scrape) │
+│ • Prometheus (metrics) • Grafana (visualization) │
+│ • Grafana (dashboards) │
+│ │
 └────────────────────────────────────────────────────────────────────┘
 
 Why Separate VMs?
 ✓ Simulates real-world backhaul latency between RAN and Core
 ✓ Allows independent scaling and resource allocation
 ✓ Isolates Radio interference simulation from control logic
+
 ```
 
 ---
@@ -312,18 +319,20 @@ Why Separate VMs?
 ## 📁 Project Structure
 
 ```
+
 devops-5g-project/
-├── README.md                           # Project overview (this file)
-├── PHASE-1-Infrastructure-Config.md    # Complete infrastructure guide
-├── PHASE-2-Testing-Benchmarking.md     # Benchmarking & observability
-├── WORKING-CONFIG-REFERENCE.md         # All configuration templates
-├── DOCUMENTATION-INDEX.md              # Navigation guide
-├── QUICK-START-CHEATSHEET.md           # Quick reference
-├── MASTER-EXECUTION-ALIGNMENT.md       # Compliance checklist
-├── IMPLEMENTATION-RESOURCES.md         # Where to get Terraform/Ansible code
-├── .gitignore                          # Git ignore rules
-└── .git/                               # Version control
-```
+├── README.md # Project overview (this file)
+├── PHASE-1-Infrastructure-Config.md # Complete infrastructure guide
+├── PHASE-2-Testing-Benchmarking.md # Benchmarking & observability
+├── WORKING-CONFIG-REFERENCE.md # All configuration templates
+├── DOCUMENTATION-INDEX.md # Navigation guide
+├── QUICK-START-CHEATSHEET.md # Quick reference
+├── MASTER-EXECUTION-ALIGNMENT.md # Compliance checklist
+├── IMPLEMENTATION-RESOURCES.md # Where to get Terraform/Ansible code
+├── .gitignore # Git ignore rules
+└── .git/ # Version control
+
+````
 
 **Pure Documentation Design** - All code is documented with links to official sources.
 
@@ -337,7 +346,7 @@ devops-5g-project/
 # You will need:
 gcloud auth login          # Google Cloud authentication
 gcloud config set project telecom5g-prod2
-```
+````
 
 ### Three-Step Deployment
 

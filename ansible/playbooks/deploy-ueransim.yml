@@ -95,7 +95,7 @@
           ignoreStreamIds: false
         owner: ubuntu
         group: ubuntu
-        mode: '0644'
+        mode: "0644"
 
     - name: Create UE configuration template
       copy:
@@ -118,7 +118,7 @@
           configureRouting: true
         owner: ubuntu
         group: ubuntu
-        mode: '0644'
+        mode: "0644"
 
     - name: UERANSIM deployment complete
       debug:
