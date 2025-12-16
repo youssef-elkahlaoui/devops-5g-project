@@ -176,6 +176,10 @@
           evaluation_interval: 15s
 
         scrape_configs:
+          - job_name: 'prometheus'
+            static_configs:
+              - targets: ['localhost:9090']
+          
           - job_name: 'open5gs'
             static_configs:
               - targets: ['localhost:9090']
@@ -185,15 +189,33 @@
         chown prometheus:prometheus /etc/prometheus/prometheus.yml
         chmod 644 /etc/prometheus/prometheus.yml
         chown -R prometheus:prometheus /var/lib/prometheus
+        chown -R prometheus:prometheus /etc/prometheus
 
-    - name: Start Prometheus (optional monitoring)
+    - name: Configure Prometheus startup arguments
+      lineinfile:
+        path: /etc/default/prometheus
+        regexp: '^ARGS='
+        line: 'ARGS="--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/var/lib/prometheus/metrics2/ --web.console.templates=/etc/prometheus/consoles --web.console.libraries=/etc/prometheus/console_libraries"'
+        create: yes
+
+    - name: Create Prometheus metrics directory
+      file:
+        path: /var/lib/prometheus/metrics2
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: "0755"
+
+    - name: Restart Prometheus to apply configuration
       systemd:
         name: prometheus
-        state: started
+        state: restarted
         enabled: yes
         daemon_reload: yes
       register: prometheus_result
-      ignore_errors: yes
+      retries: 3
+      until: prometheus_result is succeeded
+      delay: 5
 
     - name: Wait for Open5GS services to be ready
       wait_for:
