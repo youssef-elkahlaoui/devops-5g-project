@@ -90,12 +90,11 @@ devops-5g-project/
 
 ## 📚 Documentation
 
-| Document | Purpose |
-|----------|---------|
+| Document                                                                           | Purpose                                                                                                  |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | [PHASE-1-VM-Infrastructure-Deployment.md](PHASE-1-VM-Infrastructure-Deployment.md) | **⭐ VM preparation, Terraform infrastructure provisioning, Ansible setup, Open5GS/UERANSIM deployment** |
-| [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md) | Testing, benchmarking, performance comparison of 4G vs 5G |
-| [WORKING-CONFIG-REFERENCE.md](WORKING-CONFIG-REFERENCE.md) | Verified 5G configuration (PLMN 999/70, IMSI, security keys) |
-| [CLEANUP-OLD-VMS.md](CLEANUP-OLD-VMS.md) | Steps to clean up old GCP resources |
+| [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md)                 | Testing, benchmarking, performance comparison, configuration reference, troubleshooting                  |
+| [CLEANUP-OLD-VMS.md](CLEANUP-OLD-VMS.md)                                           | Steps to clean up old GCP resources                                                                      |
 
 ---
 
@@ -218,9 +217,7 @@ resource "google_compute_instance" "core" {
 
 For **complete deployment instructions**, see [PHASE-1-VM-Infrastructure-Deployment.md](PHASE-1-VM-Infrastructure-Deployment.md).
 
-For **testing and benchmarking**, see [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md).
-
-For **5G network configuration reference**, see [WORKING-CONFIG-REFERENCE.md](WORKING-CONFIG-REFERENCE.md).
+For **testing, benchmarking, configuration reference, and troubleshooting**, see [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md).
 
 ---
 

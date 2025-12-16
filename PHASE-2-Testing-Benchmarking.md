@@ -32,7 +32,153 @@ This discipline ensures your benchmarking is scientifically valid.
 
 ---
 
-## 📊 Benchmarking Methodology
+## � Working Configuration Reference
+
+This section contains all verified working configurations from PHASE-1. Use these as reference during testing.
+
+### Network Parameters
+
+```
+Cloud Provider: Google Cloud Platform (GCP)
+Zone: us-central1-a
+VPC: open5gs-vpc (10.10.0.0/16)
+Control Subnet: 10.10.0.0/24
+
+PLMN Configuration (IMPORTANT - DO NOT CHANGE):
+├── MCC: 999
+├── MNC: 70
+├── TAC: 1
+└── Slices: SST=0 (default slice)
+
+Subscriber Configuration:
+├── IMSI: 999700000000001 or 999700000000002
+├── Key (K): 465B5CE8B199B49FAA5F0A2EE238A6BC
+├── OPc: E8ED289DEBA952E4283B54E88E6183CA
+├── AMF: 8000
+└── DNN: internet
+
+UE Interface:
+├── Interface: uesimtun0
+├── Subnet: 10.45.0.0/16
+├── Gateway: 10.45.0.1
+└── DNS: 8.8.8.8, 8.8.4.4
+```
+
+### Core Network Ports (vm-core: 10.10.0.2)
+
+| Service     | Protocol | Port  | Direction  |
+|-------------|----------|-------|------------|
+| NRF         | HTTP/2   | 7777  | Internal   |
+| AMF         | SCTP     | 38412 | From RAN   |
+| AMF         | HTTP/2   | 7778  | Internal   |
+| SMF         | HTTP/2   | 7776  | Internal   |
+| UDM         | HTTP/2   | 7780  | Internal   |
+| UDR         | HTTP/2   | 7783  | Internal   |
+| PCF         | HTTP/2   | 7781  | Internal   |
+| AUSF        | HTTP/2   | 7779  | Internal   |
+| UPF (PFCP)  | UDP      | 8805  | From SMF   |
+| UPF (GTP-U) | UDP      | 2152  | From RAN   |
+| GTP-C       | UDP      | 2123  | From SMF   |
+| MongoDB     | TCP      | 27017 | Local only |
+
+### UERANSIM Configuration
+
+**gNB (5G Base Station):** `~/UERANSIM/config/open5gs-gnb.yaml`
+
+```yaml
+mcc: "999"
+mnc: "70"
+nci: "0x000000010"
+tac: 1
+linkIp: 10.10.0.100
+ngapIp: 10.10.0.100
+gtpIp: 10.10.0.100
+amfConfigs:
+  - address: 10.10.0.2
+    port: 38412
+slices:
+  - sst: 0
+ignoreStreamIds: true
+```
+
+**UE (5G User Equipment):** `~/UERANSIM/config/open5gs-ue.yaml`
+
+```yaml
+supi: "imsi-999700000000001"
+mcc: "999"
+mnc: "70"
+key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
+op: "E8ED289DEBA952E4283B54E88E6183CA"
+opType: "OPC"
+amf: "8000"
+gnbSearchList: [10.10.0.100]
+sessions:
+  - type: "IPv4"
+    apn: "internet"
+    slice: { sst: 0 }
+configured-nssai: [{ sst: 0 }]
+default-nssai: [{ sst: 0 }]
+integrity: { IA1: false, IA2: true, IA3: false }
+ciphering: { EA1: false, EA2: true, EA3: false }
+integrityMaxRate: { uplink: "full", downlink: "full" }
+```
+
+### Performance Baselines
+
+| Metric               | Value         |
+|----------------------|---------------|
+| gNB Connection Time  | < 5 seconds   |
+| UE Registration Time | 30-60 seconds |
+| Session Setup Time   | 10-15 seconds |
+| Ping Success Rate    | > 99%         |
+| Average Latency      | 8-12ms        |
+| Throughput           | 200-500 Mbps  |
+
+### Health Check Commands
+
+```bash
+# SSH into vm-core
+gcloud compute ssh vm-core --zone=us-central1-a
+
+# Check all services are running
+sudo systemctl status open5gs-*
+
+# Verify AMF listening on SCTP 38412
+sudo netstat -tlnup | grep 38412
+
+# Check MongoDB
+mongosh --eval "db.adminCommand('ping')"
+
+# View recent AMF logs
+journalctl -u open5gs-amfd -n 50
+
+# SSH into vm-ran
+gcloud compute ssh vm-ran --zone=us-central1-a
+
+# Start gNB
+cd ~/UERANSIM
+timeout 15 ./build/nr-gnb -c config/open5gs-gnb.yaml
+
+# In another terminal on vm-ran, start UE
+sudo ./build/nr-ue -c config/open5gs-ue.yaml
+
+# Test connectivity
+sudo ip addr show uesimtun0
+sudo ping -I uesimtun0 -c 5 8.8.8.8
+```
+
+### Common Issues & Solutions
+
+| Issue | Root Cause | Solution |
+|-------|-----------|----------|
+| gNB shows "slice-not-supported" | Slice config mismatch | Verify gNB has `slices: [{sst: 0}]`, AMF has `s_nssai: [{sst: 0}]` |
+| UE can't find cell | gNB not accessible | Check `ps aux \| grep nr-gnb`, verify port 38412 open, check firewall |
+| MongoDB connection failed | MongoDB not running | `sudo systemctl restart mongod` |
+| AMF won't start | Missing PLMN config | Verify MCC=999, MNC=70 in all configs, check YAML syntax |
+
+---
+
+## �📊 Benchmarking Methodology
 
 ### The Contrast: Physical Layer vs Protocol Layer
 
