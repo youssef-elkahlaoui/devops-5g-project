@@ -124,6 +124,44 @@
       retries: 3
       delay: 5
 
+    - name: Wait for MongoDB to be ready
+      shell: |
+        for i in {1..30}; do
+          mongosh --eval "db.adminCommand('ping')" > /dev/null 2>&1 && echo "MongoDB is ready" && exit 0
+          echo "Waiting for MongoDB... ($i/30)"
+          sleep 2
+        done
+        echo "MongoDB failed to start"
+        exit 1
+      ignore_errors: yes
+
+    - name: Configure NRF with PLMN 999/70
+      shell: |
+        sed -i '/plmn_id:/,/mnc:/ {
+          s/mcc: .*/mcc: 999/
+          s/mnc: .*/mnc: 70/
+        }' /etc/open5gs/nrf.yaml
+      ignore_errors: yes
+
+    - name: Configure AMF with PLMN 999/70 and NGAP address
+      shell: |
+        sed -i 's/address: 127.0.0.5/address: 0.0.0.0/g' /etc/open5gs/amf.yaml
+        sed -i '/guami:/,/plmn_support:/ {
+          s/mcc: .*/mcc: 999/
+          s/mnc: .*/mnc: 70/
+        }' /etc/open5gs/amf.yaml
+      ignore_errors: yes
+
+    - name: Configure SMF
+      shell: |
+        sed -i 's/address: 127.0.0.4/address: 0.0.0.0/g' /etc/open5gs/smf.yaml
+      ignore_errors: yes
+
+    - name: Configure UPF with GTP-U address
+      shell: |
+        sed -i 's/address: 127.0.0.7/address: 0.0.0.0/g' /etc/open5gs/upf.yaml
+      ignore_errors: yes
+
     - name: Start Open5GS services
       systemd:
         name: open5gs-{{ item }}
