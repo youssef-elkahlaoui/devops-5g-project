@@ -1,0 +1,79 @@
+---
+- name: Deploy Open5GS 5G Core Network
+  hosts: control_plane
+  become: true
+  tasks:
+    - name: Update system packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install MongoDB
+      apt:
+        name: mongodb
+        state: present
+
+    - name: Add Open5GS PPA
+      apt_repository:
+        repo: ppa:open5gs/latest
+        state: present
+
+    - name: Install Open5GS packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - open5gs-nrf
+        - open5gs-amf
+        - open5gs-smf
+        - open5gs-upf
+        - open5gs-udm
+        - open5gs-udr
+        - open5gs-pcf
+        - open5gs-ausf
+        - open5gs-webui
+
+    - name: Enable IP forwarding (critical for NAT)
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        sysctl_set: yes
+
+    - name: Configure NAT masquerading for UE subnet
+      iptables:
+        table: nat
+        chain: POSTROUTING
+        source: 10.45.0.0/16
+        jump: MASQUERADE
+
+    - name: Start Open5GS services
+      systemd:
+        name: open5gs-{{ item }}
+        state: started
+        enabled: yes
+      loop:
+        - nrf
+        - amf
+        - smf
+        - upf
+        - udm
+        - udr
+        - pcf
+        - ausf
+
+    - name: Start MongoDB
+      systemd:
+        name: mongodb
+        state: started
+        enabled: yes
+
+    - name: Install Prometheus
+      apt:
+        name: prometheus
+        state: present
+
+    - name: Start Prometheus
+      systemd:
+        name: prometheus
+        state: started
+        enabled: yes

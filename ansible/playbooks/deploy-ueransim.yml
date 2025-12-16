@@ -1,0 +1,51 @@
+---
+- name: Deploy UERANSIM 5G RAN Simulator
+  hosts: ran_nodes
+  become: true
+  tasks:
+    - name: Install build dependencies
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - build-essential
+        - cmake
+        - git
+        - libsctp-dev
+        - lksctp-tools
+        - iproute2
+        - iputils-ping
+        - curl
+        - wget
+
+    - name: Clone UERANSIM from GitHub
+      git:
+        repo: https://github.com/aligungr/UERANSIM
+        dest: /home/ubuntu/UERANSIM
+        version: v3.2.6
+        update: yes
+
+    - name: Build UERANSIM
+      shell: |
+        cd /home/ubuntu/UERANSIM
+        make -j$(nproc)
+      register: build_result
+
+    - name: Display build status
+      debug:
+        msg: "UERANSIM build completed: {{ build_result.rc }}"
+
+    - name: Create UERANSIM config directory
+      file:
+        path: /home/ubuntu/UERANSIM/config
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Fix UERANSIM ownership
+      file:
+        path: /home/ubuntu/UERANSIM
+        owner: ubuntu
+        group: ubuntu
+        recurse: yes
