@@ -87,11 +87,16 @@
         - open5gs-udr
         - open5gs-pcf
         - open5gs-ausf
-        - open5gs-webui
       register: apt_result
       until: apt_result is succeeded
       retries: 3
       delay: 10
+
+    - name: Install Open5GS WebUI (using official installation script)
+      shell: curl -fsSL https://open5gs.org/open5gs/assets/webui/install | bash -
+      environment:
+        SUDO_USER: root
+      ignore_errors: yes
 
     - name: Enable IP forwarding (critical for NAT)
       sysctl:
