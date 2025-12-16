@@ -48,6 +48,48 @@ cd ../ansible
 ansible-playbook -i inventory/hosts.ini playbooks/deploy-core.yml
 ```
 
+---
+
+## 🚨 Quick Fix Reference
+
+### WebUI Not Accessible (ERR_CONNECTION_REFUSED)
+
+**Problem:** WebUI runs but http://<IP>:9999 is not accessible from browser
+
+```bash
+# Fix WebUI binding to 0.0.0.0 instead of localhost
+sudo sed -i "s/'localhost'/'0.0.0.0'/" /usr/lib/node_modules/open5gs/server/index.js
+sudo systemctl restart open5gs-webui
+
+# Verify
+sudo ss -tlnp | grep 9999  # Should show: 0.0.0.0:9999 (not 127.0.0.1)
+```
+
+### Prometheus Port Conflict
+
+**Problem:** Prometheus fails with "bind: address already in use" on port 9090
+
+```bash
+# Change Prometheus from port 9090 to 9091 (Open5GS uses 9090 for metrics)
+echo 'ARGS="--web.listen-address=0.0.0.0:9091"' | sudo tee /etc/default/prometheus
+sudo systemctl daemon-reload
+sudo systemctl restart prometheus
+
+# Access: http://<IP>:9091
+```
+
+### All Open5GS Services Status
+
+```bash
+# Check all 8 core services at once
+for svc in nrfd amfd smfd upfd udmd udrd pcfd ausfd; do
+  echo -n "open5gs-$svc: "
+  systemctl is-active open5gs-$svc
+done
+```
+
+---
+
 ### Step 4: Deploy UERANSIM RAN Simulator
 
 ```bash

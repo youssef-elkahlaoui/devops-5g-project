@@ -98,6 +98,9 @@
         SUDO_USER: root
       ignore_errors: yes
 
+    # CRITICAL FIX: WebUI defaults to 'localhost' which binds to 127.0.0.1 (local only)
+    # This prevents external access even with open firewall rules
+    # Must change to '0.0.0.0' to accept connections from any interface
     - name: Configure WebUI to listen on all interfaces (0.0.0.0:9999)
       shell: |
         sed -i "s/const _hostname = process.env.HOSTNAME || 'localhost';/const _hostname = process.env.HOSTNAME || '0.0.0.0';/" /usr/lib/node_modules/open5gs/server/index.js
