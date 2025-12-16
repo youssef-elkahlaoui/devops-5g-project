@@ -39,6 +39,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/deploy-core.yml -vv
 ```
 
 **Expected output:**
+
 ```
 PLAY RECAP ****
 vm-core : ok=XX changed=XX unreachable=0 ✅
@@ -69,6 +70,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/deploy-ueransim.yml -vv
 ```
 
 **Expected output:**
+
 ```
 PLAY RECAP ****
 vm-ran : ok=XX changed=XX unreachable=0 ✅
@@ -127,6 +129,7 @@ sudo ping -I uesimtun0 -c 5 8.8.8.8
 **Error:** Running deploy-ueransim.yml gives "No route to host"
 
 **Fix:**
+
 ```bash
 # On vm-core, verify SSH setup
 sudo ssh -i /root/.ssh/id_ed25519 root@10.10.0.100 "whoami"
@@ -141,6 +144,7 @@ sudo bash ~/setup-ssh.sh
 **Error:** gNB cannot connect to AMF
 
 **Check:**
+
 ```bash
 # On vm-core
 sudo ss -tlnp | grep 38412
@@ -156,6 +160,7 @@ nc -zv 10.10.0.2 38412
 **Error:** UE cannot register (no SST=1 subscriber)
 
 **Check:**
+
 ```bash
 # On vm-core, verify subscriber
 mongosh --eval "db.subscribers.find({imsi:'999700000000001'}).pretty()" open5gs
@@ -170,9 +175,7 @@ After deployment:
 
 - **WebUI (Subscriber Management):** http://<vm-core-public-ip>:9999
   - Login: admin / 1423
-  
 - **Prometheus (Metrics):** http://<vm-core-public-ip>:9091
-  
 - **MongoDB (Database):** mongodb://10.10.0.2:27017
 
 ---

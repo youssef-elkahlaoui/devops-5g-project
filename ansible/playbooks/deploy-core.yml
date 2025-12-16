@@ -323,21 +323,21 @@
           ====================================
           Open5GS Core Network Deployment ✅
           ====================================
-          
+
           All services running:
           - MongoDB: mongod
           - Open5GS: nrfd, amfd, smfd, upfd, udmd, udrd, pcfd, ausfd
           - Prometheus: port 9091
           - WebUI: port 9999
-          
+
           ====================================
           SSH Setup for vm-core → vm-ran:
           ====================================
           SSH key for root user created.
-          
+
           Next: Deploy UERANSIM with:
             ansible-playbook -i inventory/hosts.ini playbooks/deploy-ueransim.yml
-          
+
           ===================================="
 
     - name: Display Open5GS services status
