@@ -220,310 +220,140 @@ Save these outputs for later use:
 
 ---
 
-## 🐧 Step 3: System Preparation on VMs (20 minutes)
+## 🐧 Step 3: Configure SSH & Ansible (10 minutes)
 
-### 3.1 SSH into vm-core
-
-```bash
-gcloud compute ssh vm-core --zone=$ZONE
-```
-
-### 3.2 Update System
+### 3.1 Generate SSH Key (If Needed)
 
 ```bash
-sudo apt update
-sudo apt upgrade -y
-sudo apt install -y curl wget git build-essential
+# Generate ED25519 SSH key
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""
 ```
 
-### 3.3 Disable Swap (Required for Open5GS)
+### 3.2 Disable OS Login on VMs
 
 ```bash
-sudo swapoff -a
-sudo sed -i '/ swap / s/^/#/' /etc/fstab
+gcloud compute instances add-metadata vm-core \
+  --zone=us-central1-a \
+  --metadata enable-oslogin=FALSE
+
+gcloud compute instances add-metadata vm-ran \
+  --zone=us-central1-a \
+  --metadata enable-oslogin=FALSE
+
+sleep 10
 ```
 
-### 3.4 Enable IP Forwarding
+### 3.3 Add SSH Keys to VM Metadata
 
 ```bash
-sudo sysctl -w net.ipv4.ip_forward=1
-sudo sysctl -w net.ipv4.conf.all.forwarding=1
-echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
-sudo sysctl -p
+# Add SSH key to vm-core
+gcloud compute instances add-metadata vm-core \
+  --zone=us-central1-a \
+  --metadata-from-file ssh-keys=<(echo "ubuntu:$(cat ~/.ssh/id_ed25519.pub)")
+
+# Add SSH key to vm-ran
+gcloud compute instances add-metadata vm-ran \
+  --zone=us-central1-a \
+  --metadata-from-file ssh-keys=<(echo "ubuntu:$(cat ~/.ssh/id_ed25519.pub)")
+
+sleep 30
 ```
 
-### 3.5 Create TUN/TAP Device
+### 3.4 Verify Ansible Connection
 
 ```bash
-sudo ip tuntap add name ogstun mode tun
-sudo ip addr add 10.45.0.1/16 dev ogstun
-sudo ip link set dev ogstun up
+cd ansible
+
+# Test SSH connectivity
+ansible all -i inventory/hosts.ini -m ping
 ```
 
-### 3.6 Repeat for vm-ran
-
-```bash
-gcloud compute ssh vm-ran --zone=$ZONE
-# Repeat steps 3.2-3.4 (skip 3.5 as no TUN needed on RAN)
-```
+Expected output: Both hosts respond with `pong`
 
 ---
 
-## 📦 Step 4: Open5GS Installation (60 minutes)
+## 📦 Step 4: Deploy Open5GS with Ansible (5-10 minutes)
 
-### 4.1 Add Open5GS Repository
-
-On **vm-core**:
+### 4.1 Run Open5GS Deployment Playbook
 
 ```bash
-curl -fsSL https://open5gs.org/open5gs/assets/open5gs-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/open5gs.gpg
-echo "deb [signed-by=/usr/share/keyrings/open5gs.gpg] https://ppa.launchpadcontent.com/acetcom/open5gs/ubuntu jammy main" | \
-  sudo tee /etc/apt/sources.list.d/open5gs.list
+cd ansible
 
-sudo apt update
+# Deploy Open5GS core network
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-core.yml -vv
 ```
 
-### 4.2 Install Open5GS
+**What the playbook does:**
+
+- ✅ Fixes DNS resolution (8.8.8.8, 1.1.1.1)
+- ✅ Updates system packages (with 3 retries)
+- ✅ Installs MongoDB and creates database
+- ✅ Adds Open5GS repository and installs all services
+- ✅ Enables IP forwarding
+- ✅ Creates TUN/TAP device (ogstun)
+- ✅ Configures NAT masquerading for UE subnet
+- ✅ Starts all Open5GS services (NRF, AMF, SMF, UPF, UDM, UDR, PCF, AUSF)
+- ✅ Starts MongoDB and Prometheus
+
+### 4.2 Verify Open5GS Services
+
+After the playbook completes successfully, SSH to vm-core and verify:
 
 ```bash
-sudo apt install -y open5gs open5gs-webui
-```
+gcloud compute ssh vm-core --zone=us-central1-a
 
-### 4.3 Install MongoDB
-
-```bash
-curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb.gpg
-echo "deb [signed-by=/usr/share/keyrings/mongodb.gpg] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" | \
-  sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-
-sudo apt update
-sudo apt install -y mongodb-org-mongosh mongodb-mongosh-shared-openssl3
-sudo systemctl enable mongod
-sudo systemctl start mongod
-```
-
-### 4.4 Verify Installation
-
-```bash
-# Check Open5GS services
-sudo systemctl status open5gs-nrfd
-sudo systemctl status open5gs-amfd
-sudo systemctl status open5gs-smfd
-
-# Check MongoDB
-mongosh --eval "db.adminCommand('ping')"
-```
-
----
-
-## ⚙️ Step 5: Open5GS Configuration (90 minutes)
-
-### The IP Binding Requirement (Critical Step)
-
-By default, Open5GS listens on `localhost` (127.0.0.1). This means:
-
-- ✗ vm-ran cannot reach the Core network
-- ✗ NGAP signaling (port 38412) is unreachable
-- ✗ PFCP (port 8805) is unreachable
-
-**Solution:** Update every config file (`amf.yaml`, `smf.yaml`, `upf.yaml`, etc.) to bind to the **VM's private IP address** (10.10.0.2):
-
-```yaml
-amf:
-  sbi:
-    server:
-      - address: 10.10.0.2 # ← Changed from 127.0.0.1
-        port: 7778
-```
-
-This single change enables cross-VM communication and is the difference between "network exists on localhost only" vs. "network exists across the cloud."
-
-### The NAT Masquerading Requirement (Internet Access)
-
-When your simulated 5G phone wants to ping `google.com`, here's what happens:
-
-1. **Phone generates:** `PING google.com` from inside uesimtun0 (10.45.0.2)
-2. **UPF routes:** Packet to the Core VM's default gateway
-3. **Core VM must masquerade:** Use iptables NAT to rewrite the source IP
-4. **Google sees:** Request from Core VM public IP (not from the fake 10.45.0.2)
-5. **Reply comes back** and is translated again
-
-**Configuration:**
-
-```bash
-sudo sysctl -w net.ipv4.ip_forward=1  # Enable kernel forwarding
-sudo iptables -t nat -A POSTROUTING -s 10.45.0.0/16 -j MASQUERADE
-```
-
-Without this, the simulated phone is "air-gapped" and cannot reach the internet.
-
----
-
-### 5.1 Configure NRF
-
-Edit `/etc/open5gs/nrf.yaml`:
-
-```yaml
-nrf:
-  sbi:
-    server:
-      - address: 10.10.0.2
-        port: 7777
-        http: 2
-```
-
-### 5.2 Configure AMF
-
-Edit `/etc/open5gs/amf.yaml`:
-
-```yaml
-amf:
-  sbi:
-    server:
-      - address: 10.10.0.2
-        port: 7778
-        http: 2
-  ngap:
-    server:
-      - address: 10.10.0.2
-        port: 38412
-        protocol: sctp
-  guami:
-    - plmn_id:
-        mcc: "999"
-        mnc: "70"
-      amf_id:
-        region: "00"
-        set: "001"
-  tai:
-    - plmn_id:
-        mcc: "999"
-        mnc: "70"
-      tac: 1
-  plmn_support:
-    - plmn_id:
-        mcc: "999"
-        mnc: "70"
-      s_nssai:
-        - sst: 0
-nrf:
-  uri: http://10.10.0.2:7777
-```
-
-### 5.3 Configure SMF
-
-Edit `/etc/open5gs/smf.yaml`:
-
-```yaml
-smf:
-  sbi:
-    server:
-      - address: 10.10.0.2
-        port: 7776
-        http: 2
-  pfcp:
-    server:
-      - address: 10.10.0.2
-        port: 8805
-  gtpc:
-    server:
-      - address: 10.10.0.2
-        port: 2123
-  subnet:
-    - addr: 10.45.0.0/16
-      dnn: internet
-  dns:
-    - 8.8.8.8
-    - 8.8.4.4
-nrf:
-  uri: http://10.10.0.2:7777
-upf:
-  pfcp:
-    - address: 10.10.0.2
-```
-
-### 5.4 Configure UPF
-
-Edit `/etc/open5gs/upf.yaml`:
-
-```yaml
-upf:
-  pfcp:
-    server:
-      - address: 10.10.0.2
-        port: 8805
-  gtpu:
-    server:
-      - address: 10.10.0.2
-        port: 2152
-  subnet:
-    - addr: 10.45.0.0/16
-      dnn: internet
-      dev: ogstun
-```
-
-### 5.5 Configure UDM, UDR, PCF, AUSF
-
-Update each file in `/etc/open5gs/`:
-
-```yaml
-# Common pattern for all
-nrf:
-  uri: http://10.10.0.2:7777
-
-# UDM
-udm:
-  sbi:
-    server:
-      - address: 10.10.0.2
-        port: 7780
-        http: 2
-
-# UDR
-udr:
-  sbi:
-    server:
-      - address: 10.10.0.2
-        port: 7783
-        http: 2
-
-# PCF
-pcf:
-  sbi:
-    server:
-      - address: 10.10.0.2
-        port: 7781
-        http: 2
-
-# AUSF
-ausf:
-  sbi:
-    server:
-      - address: 10.10.0.2
-        port: 7779
-        http: 2
-```
-
-### 5.6 Restart Services
-
-```bash
-sudo systemctl restart open5gs-nrfd
-sudo systemctl restart open5gs-amfd
-sudo systemctl restart open5gs-smfd
-sudo systemctl restart open5gs-udmd
-sudo systemctl restart open5gs-udrd
-sudo systemctl restart open5gs-pcfd
-sudo systemctl restart open5gs-ausfd
-sudo systemctl restart open5gs-upfd
-```
-
-### 5.7 Verify Services
-
-```bash
+# Check all services are running
 sudo systemctl status open5gs-*
+sudo systemctl status mongod
+
+# View recent logs
+journalctl -u open5gs-amfd -n 50
 ```
 
-All should show **active (running)**.
+All services should show **active (running)**.
+
+---
+
+## 🛰️ Step 5: Deploy UERANSIM with Ansible (10-15 minutes)
+
+### 5.1 Run UERANSIM Deployment Playbook
+
+```bash
+cd ansible
+
+# Deploy UERANSIM RAN simulator
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-ueransim.yml -vv
+```
+
+**What the playbook does:**
+
+- ✅ Fixes DNS resolution on vm-ran
+- ✅ Installs build dependencies (cmake, gcc, g++, libsctp-dev, etc.)
+- ✅ Clones UERANSIM v3.2.6 from GitHub
+- ✅ Compiles UERANSIM with parallel make (-j$(nproc))
+- ✅ Creates gNB configuration (`open5gs-gnb.yaml`) with PLMN 999/70
+- ✅ Creates UE configuration (`open5gs-ue.yaml`) with security keys
+- ✅ Sets proper file ownership to ubuntu user
+
+**Build time:** ~10-15 minutes (depending on VM resources)
+
+### 5.2 Verify UERANSIM Installation
+
+After the playbook completes:
+
+```bash
+gcloud compute ssh vm-ran --zone=us-central1-a
+
+# Check UERANSIM was built
+ls -la ~/UERANSIM/
+ls -la ~/UERANSIM/build/
+
+# Verify configuration files
+cat ~/UERANSIM/config/open5gs-gnb.yaml
+cat ~/UERANSIM/config/open5gs-ue.yaml
+```
+
+Expected: Both `nr-gnb` and `nr-ue` binaries exist in `~/UERANSIM/build/`
 
 ---
 
@@ -531,111 +361,51 @@ All should show **active (running)**.
 
 ### 6.1 Add Subscriber via WebUI
 
-1. Open browser: `http://<vm-core-public-ip>:3000`
-2. Login: admin / 1423
-3. Click "Subscribers"
-4. Click "+" button
-5. Fill in:
+Open5GS comes with a WebUI for subscriber management. Access it via:
+
+1. Get the public IP:
+   ```bash
+   cd terraform
+   terraform output vm_core_public_ip
+   ```
+
+2. Open browser: `http://<PUBLIC_IP>:3000`
+3. Login: **admin** / **1423**
+4. Click "**Subscribers**"
+5. Click "**+**" button to add new subscriber
+6. Fill in:
    - **Name:** test-user
    - **IMSI:** 999700000000001
    - **Secret (K):** 465B5CE8B199B49FAA5F0A2EE238A6BC
    - **OPc:** E8ED289DEBA952E4283B54E88E6183CA
    - **Slice:** SST=0, DNN=internet
+7. Click "**Save**"
 
 ### 6.2 Verify Subscriber in MongoDB
 
 ```bash
+# SSH to vm-core
+gcloud compute ssh vm-core --zone=us-central1-a
+
+# Check subscriber was created
 mongosh
 use open5gs
 db.subscribers.findOne()
 ```
 
----
-
-## 🛰️ Step 7: UERANSIM Setup on vm-ran (45 minutes)
-
-### 7.1 Install Dependencies
-
-On **vm-ran**:
-
-```bash
-sudo apt install -y git gcc g++ cmake make libsctp-dev libgtest-dev
-sudo apt install -y libssl-dev libboost-all-dev libfmt-dev
-```
-
-### 7.2 Clone UERANSIM
-
-```bash
-cd ~
-git clone https://github.com/aligungr/UERANSIM.git
-cd UERANSIM
-git checkout v3.2.6
-```
-
-### 7.3 Build UERANSIM
-
-```bash
-cd build
-cmake ..
-make -j$(nproc)
-cd ..
-```
-
-Expected output: `nr-gnb` and `nr-ue` binaries in `build/` directory
-
-### 7.4 Configure gNB
-
-Create `config/open5gs-gnb.yaml`:
-
-```yaml
-mcc: "999"
-mnc: "70"
-nci: "0x000000010"
-tac: 1
-linkIp: 10.10.0.100
-ngapIp: 10.10.0.100
-gtpIp: 10.10.0.100
-amfConfigs:
-  - address: 10.10.0.2
-    port: 38412
-slices:
-  - sst: 0
-ignoreStreamIds: true
-```
-
-### 7.5 Configure UE
-
-Create `config/open5gs-ue.yaml`:
-
-```yaml
-supi: "imsi-999700000000001"
-mcc: "999"
-mnc: "70"
-key: "465B5CE8B199B49FAA5F0A2EE238A6BC"
-op: "E8ED289DEBA952E4283B54E88E6183CA"
-opType: "OPC"
-amf: "8000"
-gnbSearchList: [10.10.0.100]
-sessions:
-  - type: "IPv4"
-    apn: "internet"
-    slice: { sst: 0 }
-configured-nssai: [{ sst: 0 }]
-default-nssai: [{ sst: 0 }]
-integrity: { IA1: false, IA2: true, IA3: false }
-ciphering: { EA1: false, EA2: true, EA3: false }
-integrityMaxRate: { uplink: "full", downlink: "full" }
-```
+Should display the subscriber record with IMSI 999700000000001.
 
 ---
 
-## ✅ Step 8: Validation & Testing (30 minutes)
+## ✅ Step 7: Validation & Testing (30 minutes)
 
-### 8.1 Test gNB Connection
+### 7.1 Test gNB Connection
 
-On **vm-ran**, in Terminal 1:
+On **vm-ran**, start the gNB:
 
 ```bash
+gcloud compute ssh vm-ran --zone=us-central1-a
+
 cd ~/UERANSIM
 timeout 15 ./build/nr-gnb -c config/open5gs-gnb.yaml
 ```
@@ -647,11 +417,15 @@ timeout 15 ./build/nr-gnb -c config/open5gs-gnb.yaml
 [ngap] [info] NG Setup procedure is successful
 ```
 
-### 8.2 Test UE Registration
+This shows the gNB successfully connected to the AMF on vm-core via the network configured by Ansible.
 
-On **vm-ran**, in Terminal 2:
+### 7.2 Test UE Registration
+
+On **vm-ran**, in a second terminal:
 
 ```bash
+gcloud compute ssh vm-ran --zone=us-central1-a
+
 cd ~/UERANSIM
 sudo ./build/nr-ue -c config/open5gs-ue.yaml
 ```
@@ -661,14 +435,22 @@ sudo ./build/nr-ue -c config/open5gs-ue.yaml
 ```
 [nas] [info] UE NAS registration procedure
 [mm] [info] MM-REGISTERED/NORMAL-SERVICE
+[ps] [info] Session established
 ```
 
-### 8.3 Test Connectivity
+This shows the UE (simulated phone) successfully registered with the 5G network.
 
-On **vm-ran**, in Terminal 3:
+### 7.3 Test Connectivity
+
+On **vm-ran**, in a third terminal:
 
 ```bash
+gcloud compute ssh vm-ran --zone=us-central1-a
+
+# Check the UE got an IP address
 sudo ip addr show uesimtun0
+
+# Test internet connectivity
 sudo ping -I uesimtun0 -c 5 8.8.8.8
 ```
 
@@ -678,7 +460,130 @@ sudo ping -I uesimtun0 -c 5 8.8.8.8
 5 packets transmitted, 5 received, 0% packet loss
 ```
 
+This demonstrates the UE can reach the internet through the UPF (configured by Ansible).
+
 ---
+
+## 🎯 Success Criteria
+
+Phase 1 is complete when:
+
+- ✅ Terraform provisioned infrastructure (2 VMs, VPC, firewall)
+- ✅ SSH keys configured and Ansible connectivity verified
+- ✅ Ansible playbook for Open5GS ran successfully
+- ✅ All Open5GS services running (`systemctl status`)
+- ✅ MongoDB accessible and subscriber provisioned
+- ✅ Ansible playbook for UERANSIM ran successfully
+- ✅ gNB shows "NG Setup procedure is successful"
+- ✅ UE shows "MM-REGISTERED/NORMAL-SERVICE"
+- ✅ Ping through uesimtun0 successful
+
+---
+
+## 📋 Summary of Ansible Automation
+
+| Step | Manual Process (Old) | Ansible Automation (New) | Time Saved |
+|------|----------------------|--------------------------|-----------|
+| System Prep | SSH, edit files, run commands | Playbook handles all | ~20 min |
+| Open5GS Install | Download, install, configure manually | Playbook + retries | ~60 min |
+| MongoDB Setup | Manual install & service start | Playbook automates | ~15 min |
+| UERANSIM Build | SSH, clone, compile, configure | Playbook + parallel build | ~45 min |
+| **TOTAL** | ~140 minutes manual work | ~15 minutes playbook | ~125 min |
+
+The Ansible playbooks ensure:
+- ✅ Consistent configuration across runs
+- ✅ Idempotent operations (safe to re-run)
+- ✅ DNS and retry logic built-in
+- ✅ All services start automatically
+- ✅ Configuration templates pre-filled with correct PLMN/IMSI
+
+---
+
+## 🐛 Troubleshooting
+
+### Ansible Playbook Fails to Connect
+
+**Issue:** Playbook says "unreachable" for hosts
+
+**Solution:**
+
+```bash
+# Verify SSH key is added
+gcloud compute instances describe vm-core --zone=us-central1-a | grep ssh-keys
+
+# Test SSH manually
+ssh -i ~/.ssh/id_ed25519 ubuntu@<PUBLIC_IP> "whoami"
+
+# Update inventory with correct public IP
+terraform output vm_core_public_ip
+```
+
+### Open5GS Services Don't Start
+
+**Issue:** Playbook completes but services are not running
+
+**Solution:**
+
+```bash
+# SSH to vm-core and check
+gcloud compute ssh vm-core --zone=us-central1-a
+
+# View service logs
+sudo journalctl -u open5gs-amfd -n 50
+
+# Check DNS resolution
+cat /etc/resolv.conf
+```
+
+### UERANSIM Build Fails
+
+**Issue:** Playbook fails at compilation step
+
+**Solution:**
+
+```bash
+# Check disk space on vm-ran
+gcloud compute ssh vm-ran --zone=us-central1-a
+df -h
+free -m
+
+# If low on space, clean and rebuild
+cd ~/UERANSIM
+make clean
+make -j$(nproc)
+```
+
+### gNB Can't Connect to AMF
+
+**Issue:** gNB shows "connection failed"
+
+**Solution:**
+
+```bash
+# Verify AMF is running on core
+gcloud compute ssh vm-core --zone=us-central1-a
+sudo systemctl status open5gs-amfd
+
+# Test connectivity from RAN to Core
+gcloud compute ssh vm-ran --zone=us-central1-a
+ping 10.10.0.2
+nc -zv 10.10.0.2 38412
+```
+
+---
+
+## 📝 Next Steps
+
+Once Phase 1 validation is complete:
+
+1. Proceed to **[PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md)**
+2. Run performance tests and benchmarks
+3. Compare 4G vs 5G performance
+4. Configure monitoring and observability
+
+---
+
+**Status:** Phase 1 Complete ✅ | **Method:** Infrastructure as Code + Ansible Automation | **Deployment Time:** ~30 minutes
 
 ## 🎯 Success Criteria
 
