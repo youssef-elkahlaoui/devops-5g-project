@@ -150,7 +150,7 @@
       retries: 3
       delay: 5
 
-    - name: Install Prometheus (optional for monitoring)
+    - name: Install Prometheus
       apt:
         name: prometheus
         state: present
@@ -158,14 +158,43 @@
       until: apt_result is succeeded
       retries: 3
       delay: 10
-      ignore_errors: yes
 
-    - name: Start Prometheus (optional - may fail if config is invalid)
+    - name: Create Prometheus data directory
+      file:
+        path: /var/lib/prometheus
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+
+    - name: Fix Prometheus configuration
+      shell: |
+        # Ensure minimal valid Prometheus config exists
+        cat > /etc/prometheus/prometheus.yml <<EOF
+        global:
+          scrape_interval: 15s
+          evaluation_interval: 15s
+        
+        scrape_configs:
+          - job_name: 'open5gs'
+            static_configs:
+              - targets: ['localhost:9090']
+        EOF
+        
+        # Fix ownership and permissions
+        chown prometheus:prometheus /etc/prometheus/prometheus.yml
+        chmod 644 /etc/prometheus/prometheus.yml
+        chown -R prometheus:prometheus /var/lib/prometheus
+
+    - name: Start Prometheus
       systemd:
         name: prometheus
         state: started
         enabled: yes
-      ignore_errors: yes
+        daemon_reload: yes
+      retries: 3
+      until: ansible_facts.services['prometheus.service'].state == 'running'
+      delay: 5
 
     - name: Display Open5GS status
       shell: systemctl status open5gs-amf --no-pager
