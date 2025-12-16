@@ -99,10 +99,11 @@
       ignore_errors: yes
 
     - name: Configure WebUI to listen on all interfaces (0.0.0.0:9999)
-      replace:
+      lineinfile:
         path: /usr/lib/node_modules/open5gs/server/index.js
-        regexp: "hostname: '(localhost|127\\.0\\.0\\.1)'"
-        replace: "hostname: '0.0.0.0'"
+        regexp: "^const _hostname = process.env.HOSTNAME \\|\\| 'localhost';"
+        line: "const _hostname = process.env.HOSTNAME || '0.0.0.0';"
+        backrefs: no
       ignore_errors: yes
 
     - name: Restart WebUI to apply configuration
