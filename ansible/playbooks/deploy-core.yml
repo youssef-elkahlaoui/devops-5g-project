@@ -31,18 +31,18 @@
       retries: 3
       delay: 10
 
-    - name: Add MongoDB GPG key (modern approach)
+    - name: Add MongoDB 8.0 GPG key (official pgp.mongodb.com)
       shell: |
-        curl -fsSL https://www.mongodb.org/static/pgp/server-5.0.asc | \
+        curl -fsSL https://pgp.mongodb.com/server-8.0.asc | \
         gpg --dearmor | \
-        tee /usr/share/keyrings/mongodb-server-5.0.gpg > /dev/null
+        tee /usr/share/keyrings/mongodb-server-8.0.gpg > /dev/null
       ignore_errors: yes
 
-    - name: Add MongoDB repository
+    - name: Add MongoDB 8.0 repository for Ubuntu 22.04 (Jammy)
       apt_repository:
-        repo: deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-5.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/5.0 multiverse
+        repo: deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse
         state: present
-        filename: mongodb-org-5.0
+        filename: mongodb-org-8.0
 
     - name: Update apt cache after MongoDB repository
       apt:
@@ -65,6 +65,14 @@
       apt_repository:
         repo: ppa:open5gs/latest
         state: present
+
+    - name: Install Node.js (required for WebUI)
+      shell: |
+        curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
+        echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+        apt-get update
+        apt-get install -y nodejs
+      ignore_errors: yes
 
     - name: Install Open5GS packages
       apt:
