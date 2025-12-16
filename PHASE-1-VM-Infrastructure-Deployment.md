@@ -364,6 +364,7 @@ Expected: Both `nr-gnb` and `nr-ue` binaries exist in `~/UERANSIM/build/`
 Open5GS comes with a WebUI for subscriber management. Access it via:
 
 1. Get the public IP:
+
    ```bash
    cd terraform
    terraform output vm_core_public_ip
@@ -482,15 +483,16 @@ Phase 1 is complete when:
 
 ## 📋 Summary of Ansible Automation
 
-| Step | Manual Process (Old) | Ansible Automation (New) | Time Saved |
-|------|----------------------|--------------------------|-----------|
-| System Prep | SSH, edit files, run commands | Playbook handles all | ~20 min |
-| Open5GS Install | Download, install, configure manually | Playbook + retries | ~60 min |
-| MongoDB Setup | Manual install & service start | Playbook automates | ~15 min |
-| UERANSIM Build | SSH, clone, compile, configure | Playbook + parallel build | ~45 min |
-| **TOTAL** | ~140 minutes manual work | ~15 minutes playbook | ~125 min |
+| Step            | Manual Process (Old)                  | Ansible Automation (New)  | Time Saved |
+| --------------- | ------------------------------------- | ------------------------- | ---------- |
+| System Prep     | SSH, edit files, run commands         | Playbook handles all      | ~20 min    |
+| Open5GS Install | Download, install, configure manually | Playbook + retries        | ~60 min    |
+| MongoDB Setup   | Manual install & service start        | Playbook automates        | ~15 min    |
+| UERANSIM Build  | SSH, clone, compile, configure        | Playbook + parallel build | ~45 min    |
+| **TOTAL**       | ~140 minutes manual work              | ~15 minutes playbook      | ~125 min   |
 
 The Ansible playbooks ensure:
+
 - ✅ Consistent configuration across runs
 - ✅ Idempotent operations (safe to re-run)
 - ✅ DNS and retry logic built-in

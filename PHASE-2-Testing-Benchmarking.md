@@ -67,7 +67,7 @@ UE Interface:
 ### Core Network Ports (vm-core: 10.10.0.2)
 
 | Service     | Protocol | Port  | Direction  |
-|-------------|----------|-------|------------|
+| ----------- | -------- | ----- | ---------- |
 | NRF         | HTTP/2   | 7777  | Internal   |
 | AMF         | SCTP     | 38412 | From RAN   |
 | AMF         | HTTP/2   | 7778  | Internal   |
@@ -126,7 +126,7 @@ integrityMaxRate: { uplink: "full", downlink: "full" }
 ### Performance Baselines
 
 | Metric               | Value         |
-|----------------------|---------------|
+| -------------------- | ------------- |
 | gNB Connection Time  | < 5 seconds   |
 | UE Registration Time | 30-60 seconds |
 | Session Setup Time   | 10-15 seconds |
@@ -169,12 +169,12 @@ sudo ping -I uesimtun0 -c 5 8.8.8.8
 
 ### Common Issues & Solutions
 
-| Issue | Root Cause | Solution |
-|-------|-----------|----------|
-| gNB shows "slice-not-supported" | Slice config mismatch | Verify gNB has `slices: [{sst: 0}]`, AMF has `s_nssai: [{sst: 0}]` |
-| UE can't find cell | gNB not accessible | Check `ps aux \| grep nr-gnb`, verify port 38412 open, check firewall |
-| MongoDB connection failed | MongoDB not running | `sudo systemctl restart mongod` |
-| AMF won't start | Missing PLMN config | Verify MCC=999, MNC=70 in all configs, check YAML syntax |
+| Issue                           | Root Cause            | Solution                                                              |
+| ------------------------------- | --------------------- | --------------------------------------------------------------------- |
+| gNB shows "slice-not-supported" | Slice config mismatch | Verify gNB has `slices: [{sst: 0}]`, AMF has `s_nssai: [{sst: 0}]`    |
+| UE can't find cell              | gNB not accessible    | Check `ps aux \| grep nr-gnb`, verify port 38412 open, check firewall |
+| MongoDB connection failed       | MongoDB not running   | `sudo systemctl restart mongod`                                       |
+| AMF won't start                 | Missing PLMN config   | Verify MCC=999, MNC=70 in all configs, check YAML syntax              |
 
 ---
 
