@@ -47,12 +47,51 @@ ssh -i ~/.ssh/id_ed25519 ubuntu@$(cd terraform && terraform output -raw vm_core_
 
 ```bash
 cd ../ansible
-ansible-playbook -i inventory/hosts.ini playbooks/deploy-core.yml
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-core.yml -vv
+```
+
+### Step 4: Setup SSH Between VMs (CRITICAL for UERANSIM)
+
+```bash
+# After deploy-core.yml completes, setup SSH key sharing
+# This allows vm-core to run Ansible on vm-ran
+
+# Copy setup script to vm-core
+gcloud compute scp setup-ssh.sh vm-core:~/ --zone=us-central1-a
+
+# SSH to vm-core and run setup
+gcloud compute ssh vm-core --zone=us-central1-a
+sudo bash ~/setup-ssh.sh
+
+# Output: ✅ SSH Setup Complete!
+```
+
+### Step 5: Deploy UERANSIM RAN Simulator
+
+```bash
+# From vm-core, deploy UERANSIM
+cd ~/devops-5g-project/ansible
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-ueransim.yml -vv
+
+# Expected: PLAY RECAP shows vm-ran with ok=XX changed=XX unreachable=0
 ```
 
 ---
 
 ## 🚨 Quick Fix Reference
+
+### SSH Connection Refused (vm-core → vm-ran)
+
+**Problem:** "No route to host" or "Connection refused" when running Ansible from vm-core
+
+```bash
+# Run this on vm-core
+sudo bash ~/setup-ssh.sh
+
+# Verify SSH works
+sudo ssh -i /root/.ssh/id_ed25519 root@10.10.0.100 "whoami"
+# Expected: root
+```
 
 ### WebUI Not Accessible (ERR_CONNECTION_REFUSED)
 

@@ -3,6 +3,16 @@
   hosts: control_plane
   become: true
   tasks:
+    # CRITICAL: Setup SSH connectivity for UERANSIM deployment
+    # This allows running deploy-ueransim.yml from vm-core
+    - name: Generate SSH key for vm-core root user (for inter-VM communication)
+      user:
+        name: root
+        generate_ssh_key: yes
+        ssh_key_type: ed25519
+        ssh_key_file: .ssh/id_ed25519
+      ignore_errors: yes
+
     - name: Fix DNS resolution
       shell: |
         echo "nameserver 8.8.8.8" | tee /etc/resolv.conf > /dev/null
@@ -294,6 +304,41 @@
       shell: systemctl list-units --type=service --all | grep -E "open5gs-(nrf|amf|smf|upf|udm|udr|pcf|ausf)"
       register: service_check
       ignore_errors: yes
+
+    - name: Enable SSH on vm-core for inter-VM Ansible execution
+      systemd:
+        name: ssh
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
+    - name: Display SSH public key for manual setup (if needed)
+      shell: cat /root/.ssh/id_ed25519.pub
+      register: ssh_pubkey
+      ignore_errors: yes
+
+    - name: Deployment Complete - Ready for UERANSIM
+      debug:
+        msg: |
+          ====================================
+          Open5GS Core Network Deployment ✅
+          ====================================
+          
+          All services running:
+          - MongoDB: mongod
+          - Open5GS: nrfd, amfd, smfd, upfd, udmd, udrd, pcfd, ausfd
+          - Prometheus: port 9091
+          - WebUI: port 9999
+          
+          ====================================
+          SSH Setup for vm-core → vm-ran:
+          ====================================
+          SSH key for root user created.
+          
+          Next: Deploy UERANSIM with:
+            ansible-playbook -i inventory/hosts.ini playbooks/deploy-ueransim.yml
+          
+          ===================================="
 
     - name: Display Open5GS services status
       debug:

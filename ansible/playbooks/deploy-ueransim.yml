@@ -3,6 +3,21 @@
   hosts: ran_nodes
   become: true
   tasks:
+    # CRITICAL: Enable SSH for inter-VM Ansible execution from vm-core
+    - name: Ensure SSH server is running
+      systemd:
+        name: ssh
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
+    - name: Ensure .ssh directory exists for root
+      file:
+        path: /root/.ssh
+        state: directory
+        mode: '0700'
+      ignore_errors: yes
+
     - name: Fix DNS resolution
       shell: |
         echo "nameserver 8.8.8.8" | tee /etc/resolv.conf > /dev/null
