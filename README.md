@@ -62,6 +62,7 @@ devops-5g-project/
 
 ---
 
+
 ## 🏢 Executive Summary
 
 This project demonstrates a modern **DevOps approach to telecommunications** by treating the mobile network as code (**Network as Code**). Rather than manually clicking in the GCP console, you automate the deployment of a dual-core network (supporting both legacy 4G LTE and standalone 5G SA) using:
