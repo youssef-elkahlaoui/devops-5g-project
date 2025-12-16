@@ -98,19 +98,11 @@
         SUDO_USER: root
       ignore_errors: yes
 
-    - name: Configure WebUI to listen on all interfaces
-      shell: |
-        # Find the WebUI directory
-        WEBUI_DIR=$(find /usr -name "open5gs" -type d 2>/dev/null | grep -i webui | head -1)
-        if [ -z "$WEBUI_DIR" ]; then
-          WEBUI_DIR="/usr/lib/node_modules/open5gs"
-        fi
-        
-        # Update server configuration to bind to 0.0.0.0
-        if [ -f "$WEBUI_DIR/server/index.js" ]; then
-          sed -i "s/hostname: 'localhost'/hostname: '0.0.0.0'/g" "$WEBUI_DIR/server/index.js"
-          sed -i "s/hostname: '127.0.0.1'/hostname: '0.0.0.0'/g" "$WEBUI_DIR/server/index.js"
-        fi
+    - name: Configure WebUI to listen on all interfaces (0.0.0.0:9999)
+      replace:
+        path: /usr/lib/node_modules/open5gs/server/index.js
+        regexp: "hostname: '(localhost|127\\.0\\.0\\.1)'"
+        replace: "hostname: '0.0.0.0'"
       ignore_errors: yes
 
     - name: Restart WebUI to apply configuration
@@ -215,7 +207,7 @@
     - name: Configure Prometheus startup arguments
       lineinfile:
         path: /etc/default/prometheus
-        regexp: '^ARGS='
+        regexp: "^ARGS="
         line: 'ARGS="--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/var/lib/prometheus/metrics2/ --web.console.templates=/etc/prometheus/consoles --web.console.libraries=/etc/prometheus/console_libraries --web.listen-address=0.0.0.0:9091"'
         create: yes
 
