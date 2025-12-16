@@ -165,7 +165,7 @@
         state: directory
         owner: prometheus
         group: prometheus
-        mode: '0755'
+        mode: "0755"
 
     - name: Fix Prometheus configuration
       shell: |
@@ -174,13 +174,13 @@
         global:
           scrape_interval: 15s
           evaluation_interval: 15s
-        
+
         scrape_configs:
           - job_name: 'open5gs'
             static_configs:
               - targets: ['localhost:9090']
         EOF
-        
+
         # Fix ownership and permissions
         chown prometheus:prometheus /etc/prometheus/prometheus.yml
         chmod 644 /etc/prometheus/prometheus.yml
@@ -192,8 +192,9 @@
         state: started
         enabled: yes
         daemon_reload: yes
+      register: prometheus_result
       retries: 3
-      until: ansible_facts.services['prometheus.service'].state == 'running'
+      until: prometheus_result is succeeded
       delay: 5
 
     - name: Display Open5GS status
