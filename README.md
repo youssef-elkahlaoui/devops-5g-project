@@ -3,27 +3,58 @@
 **Project Title:** Cloud-Native 5G Network with Network-as-Code  
 **Project ID:** `telecom5g-prod2`  
 **Cloud Zone:** `us-central1-a`  
-**Status:** ✅ Production-Ready | ⏱️ 15-20 minutes (full deployment) | 💰 ~$10/month
+**Status:** ✅ Production-Ready | ⏱️ 30-45 minutes (full deployment) | 💰 ~$10/month
 
 ---
 
 ## 🚀 Quick Start
 
+For complete step-by-step deployment instructions, SSH setup, and troubleshooting, see [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md#-deployment-section)
+
+### Step 1: Provision Infrastructure with Terraform
+
 ```bash
-# 1. Provision infrastructure
 cd terraform
 terraform init
 terraform plan
 terraform apply -auto-approve
+```
 
-# 2. Deploy Open5GS core
+### Step 2: Configure SSH Access
+
+```bash
+# Disable OS Login
+gcloud compute instances add-metadata vm-core --zone=us-central1-a --metadata enable-oslogin=FALSE
+gcloud compute instances add-metadata vm-ran --zone=us-central1-a --metadata enable-oslogin=FALSE
+
+# Generate SSH key
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""
+
+# Add SSH keys to VMs
+gcloud compute instances add-metadata vm-core --zone=us-central1-a --metadata-from-file ssh-keys=<(echo "ubuntu:$(cat ~/.ssh/id_ed25519.pub)")
+gcloud compute instances add-metadata vm-ran --zone=us-central1-a --metadata-from-file ssh-keys=<(echo "ubuntu:$(cat ~/.ssh/id_ed25519.pub)")
+
+# Wait and test
+sleep 30
+ssh -i ~/.ssh/id_ed25519 ubuntu@$(cd terraform && terraform output -raw vm_core_public_ip) "echo 'SSH works!'"
+```
+
+### Step 3: Deploy Open5GS 5G Core
+
+```bash
 cd ../ansible
 ansible-playbook -i inventory/hosts.ini playbooks/deploy-core.yml
+```
 
-# 3. Deploy UERANSIM RAN
+### Step 4: Deploy UERANSIM RAN Simulator
+
+```bash
 ansible-playbook -i inventory/hosts.ini playbooks/deploy-ueransim.yml
+```
 
-# 4. Test connectivity
+### Step 5: Test Connectivity
+
+```bash
 bash ../scripts/test-connectivity.sh
 ```
 
@@ -42,12 +73,163 @@ devops-5g-project/
 │   ├── inventory/
 │   │   └── hosts.ini                  # Managed hosts (control_plane, ran_nodes)
 │   └── playbooks/
+├── scripts/                           # Test and utility scripts
+│   └── test-connectivity.sh           # 5G connectivity verification
+└── Documentation/
+    ├── README.md                      # This file (quick reference)
+    ├── PHASE-1-Infrastructure-Config.md
+    ├── PHASE-2-Testing-Benchmarking.md    # ⭐ Complete deployment guide
+    ├── PHASE-3-VM-Monitoring.md
+    ├── WORKING-CONFIG-REFERENCE.md
+    └── CLEANUP-OLD-VMS.md
+```
+
+---
+
+## 📚 Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md) | **⭐ Complete deployment guide with SSH setup, Ansible playbooks, configuration tables, and troubleshooting** |
+| [PHASE-1-Infrastructure-Config.md](PHASE-1-Infrastructure-Config.md) | 5G network configuration reference |
+| [WORKING-CONFIG-REFERENCE.md](WORKING-CONFIG-REFERENCE.md) | Verified 5G configuration (PLMN 999/70, IMSI, security keys) |
+| [CLEANUP-OLD-VMS.md](CLEANUP-OLD-VMS.md) | Steps to clean up old GCP resources |
+
+---
+
+## 🎯 Key Features
+
+- **Infrastructure as Code:** Complete Terraform configuration for GCP
+- **SSH Authentication:** ED25519 keys with OS Login disabled
+- **Ansible Automation:** Playbooks for Open5GS and UERANSIM deployment
+- **DNS Resolution:** Fixed nameservers (8.8.8.8, 1.1.1.1) for reliable package installation
+- **Retry Logic:** 3-attempt retry on failed package installations
+- **Build Optimization:** Parallel compilation for UERANSIM (make -j$(nproc))
+- **Configuration Templates:** Pre-configured gNB and UE YAML files with PLMN 999/70
+
+---
+
+## 🔧 Technology Stack
+
+| Component | Version | Purpose |
+|-----------|---------|---------|
+| **Terraform** | 1.x | Infrastructure provisioning |
+| **GCP** | latest | Cloud platform (e2-medium VMs, 4GB RAM each) |
+| **Ubuntu** | 22.04 | Base OS for both VMs |
+| **Ansible** | 2.10+ | Configuration management |
+| **Open5GS** | Latest | 5G core network components |
+| **UERANSIM** | v3.2.6 | 5G RAN simulator (gNB + UE) |
+| **MongoDB** | Latest | Open5GS subscriber database |
+
+---
+
+## 🌐 Network Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Google Cloud Platform                        │
+│                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │              VPC: open5gs-vpc (10.10.0.0/24)             │  │
+│  │                                                           │  │
+│  │  ┌─────────────────┐          ┌─────────────────────┐    │  │
+│  │  │   VM Core       │          │    VM RAN           │    │  │
+│  │  │   10.10.0.2     │◄────────►│   10.10.0.100       │    │  │
+│  │  │                 │  NGAP    │                     │    │  │
+│  │  │ • NRF (29510)   │ (38412)  │ • gNB (simulated)   │    │  │
+│  │  │ • AMF (38412)   │          │ • UE (simulated)    │    │  │
+│  │  │ • SMF (8805)    │          │                     │    │  │
+│  │  │ • UPF           │          │ PLMN: 999/70        │    │  │
+│  │  │ • MongoDB       │          │ IMSI: 999700000..   │    │  │
+│  │  │ • Prometheus    │          │                     │    │  │
+│  │  └─────────────────┘          └─────────────────────┘    │  │
+│  │                                                           │  │
+│  │              UE Subnet: 10.45.0.0/16 (TAP)              │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  Firewall Rules:                                                │
+│  • allow-5g-lab (all protocols within VPC)                      │
+│  • allow-ssh (TCP:22 from any IP)                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ✅ Deployment Checklist
+
+- [ ] GCP project created and billing enabled
+- [ ] `gcloud`, `terraform`, `ansible` installed
+- [ ] Terraform infrastructure provisioned (6 resources)
+- [ ] SSH keys configured and tested
+- [ ] Open5GS deployed and services running
+- [ ] UERANSIM built and configured
+- [ ] Connectivity tests passing
+
+---
+
+## 💾 Example Configuration Files
+
+### 5G Configuration (PLMN 999/70 - Test Network)
+
+```yaml
+# From WORKING-CONFIG-REFERENCE.md
+PLMN:
+  MCC: 999
+  MNC: 70
+  SST: 0  # Slice Service Type
+
+IMSI: 999700000000001
+
+Security:
+  K: 465B5CE8B199B49FAA5F0A2EE238A6BC
+  OPc: E8ED289DEBA952E4283B54E88E6183CA
+```
+
+### Terraform Infrastructure
+
+```hcl
+# From terraform/main.tf
+resource "google_compute_instance" "core" {
+  name         = "vm-core"
+  machine_type = "e2-medium"
+  
+  network_interface {
+    network_ip = "10.10.0.2"
+    network    = google_compute_network.vpc.id
+  }
+}
+```
+
+---
+
+## 🔗 External Resources
+
+- **Open5GS Documentation:** https://open5gs.org/
+- **UERANSIM GitHub:** https://github.com/aligungr/UERANSIM
+- **GCP Terraform Provider:** https://registry.terraform.io/providers/hashicorp/google/
+- **Ansible Playbook Guide:** https://docs.ansible.com/ansible/latest/user_guide/playbooks.html
+- **3GPP 5G Specifications:** https://www.3gpp.org/
+
+---
+
+## 🆘 Support
+
+For **complete deployment instructions, SSH troubleshooting, and detailed configuration**, see [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md).
+
+For **5G network configuration reference**, see [WORKING-CONFIG-REFERENCE.md](WORKING-CONFIG-REFERENCE.md).
+
+---
+
+**Last Updated:** December 16, 2025  
+**Status:** ✅ Production-Ready | All components deployed and tested
 │       ├── deploy-core.yml            # Open5GS 5G core deployment
 │       └── deploy-ueransim.yml        # UERANSIM RAN simulator compilation
 ├── scripts/                           # Testing & utilities
 │   └── test-connectivity.sh           # Verify 5G UE attachment
+├── CLEANUP-OLD-VMS.md                 # Guide to cleanup old resources
 ├── PHASE-1-Infrastructure-Config.md   # Detailed setup guide
 ├── PHASE-2-Testing-Benchmarking.md    # Performance benchmarking
+
 ├── WORKING-CONFIG-REFERENCE.md        # All configuration details
 └── README.md                          # This file
 ```
@@ -56,9 +238,13 @@ devops-5g-project/
 
 ## 📖 Documentation
 
-1. **[PHASE-1-Infrastructure-Config.md](PHASE-1-Infrastructure-Config.md)** - Infrastructure provisioning and core network setup
-2. **[PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md)** - Performance benchmarking and observability setup
-3. **[WORKING-CONFIG-REFERENCE.md](WORKING-CONFIG-REFERENCE.md)** - Complete configuration reference (PLMN, IMSI, keys, ports)
+For detailed instructions, see:
+
+1. **[SSH-SETUP-GUIDE.md](SSH-SETUP-GUIDE.md)** - Complete SSH configuration for Ansible
+2. **[PHASE-1-Infrastructure-Config.md](PHASE-1-Infrastructure-Config.md)** - Infrastructure provisioning and core network setup
+3. **[PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md)** - Performance benchmarking and observability setup
+4. **[WORKING-CONFIG-REFERENCE.md](WORKING-CONFIG-REFERENCE.md)** - Complete configuration reference (PLMN, IMSI, keys, ports)
+5. **[CLEANUP-OLD-VMS.md](CLEANUP-OLD-VMS.md)** - Guide to cleanup old resources
 
 ---
 
