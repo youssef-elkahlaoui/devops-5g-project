@@ -1,22 +1,9 @@
 ---
 - name: Deploy UERANSIM 5G RAN Simulator
-  hosts: ran_nodes
+  hosts: fiveg_all_in_one
   become: true
   tasks:
-    # CRITICAL: Enable SSH for inter-VM Ansible execution from vm-core
-    - name: Ensure SSH server is running
-      systemd:
-        name: ssh
-        state: started
-        enabled: yes
-      ignore_errors: yes
-
-    - name: Ensure .ssh directory exists for root
-      file:
-        path: /root/.ssh
-        state: directory
-        mode: "0700"
-      ignore_errors: yes
+    # Single VM deployment: UERANSIM runs on same host as Open5GS Core
 
     - name: Fix DNS resolution
       shell: |

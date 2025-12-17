@@ -1,6 +1,6 @@
 ---
 - name: Deploy Open5GS 5G Core Network
-  hosts: control_plane
+  hosts: fiveg_all_in_one
   become: true
   tasks:
     # CRITICAL: Setup SSH connectivity for UERANSIM deployment

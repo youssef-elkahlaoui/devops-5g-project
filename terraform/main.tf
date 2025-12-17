@@ -61,13 +61,13 @@ resource "google_compute_firewall" "allow_ssh" {
 }
 
 # ================================
-#         VM Core (Control Plane)
+#         VM Core (5G Control Plane)
 # ================================
 resource "google_compute_instance" "vm_core" {
   name         = "vm-core"
   machine_type = "e2-medium"  # CRITICAL: 2vCPU, 4GB RAM minimum for stability
   zone         = "${var.region}-a"
-  description  = "5G Core Network - NRF, AMF, SMF, UPF, MongoDB, Prometheus, Grafana"
+  description  = "5G Core Network - Open5GS 5GC + UERANSIM RAN"
 
   boot_disk {
     initialize_params {
@@ -90,17 +90,17 @@ resource "google_compute_instance" "vm_core" {
     enable-oslogin = "true"
   }
 
-  tags = ["open5gs", "core"]
+  tags = ["open5gs", "5g-core"]
 }
 
 # ================================
-#         VM RAN (Radio Access)
+#         VM 4G Core (EPC)
 # ================================
-resource "google_compute_instance" "vm_ran" {
-  name         = "vm-ran"
-  machine_type = "e2-medium"  # CRITICAL: 2vCPU, 4GB RAM for srsRAN compilation
+resource "google_compute_instance" "vm_4g_core" {
+  name         = "vm-4g-core"
+  machine_type = "e2-medium"  # 2vCPU, 4GB RAM for 4G EPC
   zone         = "${var.region}-a"
-  description  = "RAN Simulator - srsRAN (4G) and UERANSIM (5G)"
+  description  = "4G Core Network - Open5GS EPC + srsRAN"
 
   boot_disk {
     initialize_params {
@@ -112,13 +112,17 @@ resource "google_compute_instance" "vm_ran" {
   network_interface {
     network    = google_compute_network.open5gs_vpc.id
     subnetwork = google_compute_subnetwork.control_subnet.id
-    network_ip = "10.10.0.100"
+    network_ip = "10.10.0.3"
+
+    access_config {
+      # Public IP for SSH and testing
+    }
   }
 
   metadata = {
     enable-oslogin = "true"
   }
 
-  tags = ["open5gs", "ran"]
+  tags = ["open5gs", "4g-core"]
 }
 # ================================

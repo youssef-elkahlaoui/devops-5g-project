@@ -1,13 +1,20 @@
-# DevOps 5G Core on GCP - Infrastructure as Code
+# DevOps 4G/5G Core on GCP - Infrastructure as Code
 
-**Project Title:** Cloud-Native 5G Network with Network-as-Code  
+**Project Title:** Cloud-Native 4G/5G Network Comparison with Network-as-Code  
 **Project ID:** `telecom5g-prod2`  
 **Cloud Zone:** `us-central1-a`  
-**Status:** ✅ Production-Ready | ⏱️ 30-45 minutes (full deployment) | 💰 ~$10/month
+**Status:** ✅ Production-Ready | ⏱️ 45-60 minutes (full deployment) | 💰 ~$15/month
+
+**Architecture:**
+
+- **vm-core** (10.10.0.2): Open5GS 5GC + UERANSIM (5G NR)
+- **vm-4g-core** (10.10.0.3): Open5GS EPC + srsRAN (4G LTE)
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start - Dual VM Deployment (4G + 5G)
+
+**Note:** Two separate single-VM deployments for performance comparison.
 
 For complete step-by-step deployment with UERANSIM fixes, see [PHASE-1-VM-Infrastructure.md](PHASE-1-VM-Infrastructure.md)
 
@@ -21,7 +28,7 @@ For monitoring setup, see [PHASE-3-VM-Monitoring.md](PHASE-3-VM-Monitoring.md)
 cd terraform
 terraform init
 terraform plan
-terraform apply -auto-approve
+terraform apply -auto-approve  # Creates vm-core only
 ```
 
 ### Step 2: Configure SSH Access
@@ -29,14 +36,12 @@ terraform apply -auto-approve
 ```bash
 # Disable OS Login
 gcloud compute instances add-metadata vm-core --zone=us-central1-a --metadata enable-oslogin=FALSE
-gcloud compute instances add-metadata vm-ran --zone=us-central1-a --metadata enable-oslogin=FALSE
 
 # Generate SSH key
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""
 
-# Add SSH keys to VMs
+# Add SSH key to VM
 gcloud compute instances add-metadata vm-core --zone=us-central1-a --metadata-from-file ssh-keys=<(echo "ubuntu:$(cat ~/.ssh/id_ed25519.pub)")
-gcloud compute instances add-metadata vm-ran --zone=us-central1-a --metadata-from-file ssh-keys=<(echo "ubuntu:$(cat ~/.ssh/id_ed25519.pub)")
 
 # Wait and test
 sleep 30
@@ -50,52 +55,103 @@ cd ../ansible
 ansible-playbook -i inventory/hosts.ini playbooks/deploy-core.yml -vv
 ```
 
-### Step 4: Setup SSH Between VMs (CRITICAL for UERANSIM)
+### Step 4: Deploy UERANSIM (Same VM)
 
 ```bash
-# After deploy-core.yml completes, setup SSH key sharing
-# This allows vm-core to run Ansible on vm-ran
-
-# Copy setup script to vm-core
-gcloud compute scp setup-ssh.sh vm-core:~/ --zone=us-central1-a
-
-# SSH to vm-core and run setup
-gcloud compute ssh vm-core --zone=us-central1-a
-sudo bash ~/setup-ssh.sh
-
-# Output: ✅ SSH Setup Complete!
+# No SSH setup needed - runs on same VM
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-ueransim.yml -vv
 ```
 
-### Step 5: Deploy UERANSIM RAN Simulator
+### Step 5: Test 5G Network
 
 ```bash
-# From vm-core, deploy UERANSIM
-cd ~/devops-5g-project/ansible
-ansible-playbook -i inventory/hosts.ini playbooks/deploy-ueransim.yml -vv
+# SSH to vm-core
+gcloud compute ssh vm-core --zone=us-central1-a
 
-# Expected: PLAY RECAP shows vm-ran with ok=XX changed=XX unreachable=0
+# Start gNB
+cd /home/ubuntu/UERANSIM
+sudo ./build/nr-gnb -c config/open5gs-gnb.yaml
+
+# In new terminal on vm-core, start UE
+sudo ./build/nr-ue -c config/open5gs-ue.yaml
+
+# In another terminal, test internet connectivity
+sudo ping -I uesimtun0 -c 5 8.8.8.8
+```
+
+**Expected Results:**
+
+- gNB: "NG Setup procedure is successful"
+- UE: "MM-REGISTERED/NORMAL-SERVICE"
+- Ping: 0% packet loss
+
+### Step 6: Deploy 4G Core (Optional - for comparison)
+
+```bash
+# Provision vm-4g-core (update terraform first)
+cd terraform
+terraform apply -auto-approve
+
+# Deploy Open5GS EPC (4G)
+cd ../ansible
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-4g-core.yml -vv
+
+# Deploy srsRAN (4G RAN simulator)
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-srsran.yml -vv
+```
+
+### Step 7: Test 4G Network
+
+```bash
+# SSH to vm-4g-core
+gcloud compute ssh vm-4g-core --zone=us-central1-a
+
+# Start eNB (in one terminal)
+sudo /home/ubuntu/start-enb.sh
+
+# Start UE (in another terminal)
+sudo /home/ubuntu/start-ue.sh
+
+# Test connectivity (in third terminal)
+sudo ip netns exec ue1 ping -c 5 8.8.8.8
+```
+
+**Expected Results:**
+
+- eNB: "S1 Setup Request successful"
+- UE: "RRC Connected"
+- Ping: 0% packet loss
+
+---
+
+## 📊 4G vs 5G Performance Comparison
+
+| Metric     | 4G (LTE)          | 5G (NR)           | Notes                     |
+| ---------- | ----------------- | ----------------- | ------------------------- |
+| Latency    | 30-50ms           | 10-20ms           | Use `ping` through tunnel |
+| Throughput | 100-150 Mbps      | 200-400 Mbps      | Use `iperf3`              |
+| Setup Time | 2-3s              | 1-2s              | Time to attach            |
+| Core       | EPC (MME/SGW/PGW) | 5GC (AMF/SMF/UPF) | Different architecture    |
+| RAN        | srsRAN eNB        | UERANSIM gNB      | Different simulators      |
+
+**Benchmark Commands:**
+
+```bash
+# 5G Throughput Test
+iperf3 -s  # On external server
+sudo ip netns exec ue1 iperf3 -c <server-ip> -t 30  # On vm-core
+
+# 4G Throughput Test
+sudo ip netns exec ue1 iperf3 -c <server-ip> -t 30  # On vm-4g-core
 ```
 
 ---
 
 ## 🚨 Quick Fix Reference
 
-### SSH Connection Refused (vm-core → vm-ran)
+### WebUI Not Accessible
 
-**Problem:** "No route to host" or "Connection refused" when running Ansible from vm-core
-
-```bash
-# Run this on vm-core
-sudo bash ~/setup-ssh.sh
-
-# Verify SSH works
-sudo ssh -i /root/.ssh/id_ed25519 root@10.10.0.100 "whoami"
-# Expected: root
-```
-
-### WebUI Not Accessible (ERR_CONNECTION_REFUSED)
-
-**Problem:** WebUI runs but http://<IP>:9999 is not accessible from browser
+**Problem:** WebUI binding to 127.0.0.1 instead of 0.0.0.0
 
 ```bash
 # Fix WebUI binding to 0.0.0.0 instead of localhost

@@ -1,0 +1,218 @@
+---
+- name: Deploy srsRAN 4G RAN Simulator
+  hosts: fourg_all_in_one
+  become: true
+  tasks:
+    - name: Fix DNS resolution
+      shell: |
+        echo "nameserver 8.8.8.8" | tee /etc/resolv.conf > /dev/null
+        echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+
+    - name: Install srsRAN build dependencies
+      apt:
+        name:
+          - build-essential
+          - cmake
+          - libfftw3-dev
+          - libmbedtls-dev
+          - libboost-program-options-dev
+          - libconfig++-dev
+          - libsctp-dev
+          - libuhd-dev
+          - uhd-host
+          - libyaml-cpp-dev
+          - libzmq3-dev
+        state: present
+        update_cache: yes
+
+    # ================================
+    #         Clone and Build srsRAN
+    # ================================
+    - name: Clone srsRAN repository
+      git:
+        repo: https://github.com/srsran/srsRAN_4G.git
+        dest: /home/ubuntu/srsRAN_4G
+        version: master
+        force: no
+
+    - name: Create build directory
+      file:
+        path: /home/ubuntu/srsRAN_4G/build
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Build srsRAN
+      shell: |
+        cd /home/ubuntu/srsRAN_4G/build
+        cmake ../ -DCMAKE_INSTALL_PREFIX=/usr/local
+        make -j$(nproc)
+        make install
+        ldconfig
+      args:
+        creates: /usr/local/bin/srsenb
+
+    # ================================
+    #         Configure srsRAN eNB (Base Station)
+    # ================================
+    - name: Create srsRAN config directory
+      file:
+        path: /home/ubuntu/srsRAN_4G/config
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Configure eNB for Open5GS EPC
+      copy:
+        dest: /home/ubuntu/srsRAN_4G/config/enb.conf
+        owner: ubuntu
+        group: ubuntu
+        content: |
+          [enb]
+          enb_id = 0x19B
+          mcc = 001
+          mnc = 01
+          mme_addr = 10.10.0.3
+          gtp_bind_addr = 10.10.0.3
+          s1c_bind_addr = 10.10.0.3
+          n_prb = 50
+
+          [enb_files]
+          sib_config = sib.conf
+          rr_config  = rr.conf
+          drb_config = drb.conf
+
+    - name: Configure SIB (System Information Block)
+      copy:
+        dest: /home/ubuntu/srsRAN_4G/config/sib.conf
+        owner: ubuntu
+        group: ubuntu
+        content: |
+          sib1 = {
+            intra_freq_reselection = "Allowed";
+            q_rx_lev_min = -70;
+            cell_barred = "NotBarred";
+            si_window_length = 20;
+            sched_info = (
+              {
+                si_periodicity = 8;
+                si_mapping_info = [ 2 ];
+              }
+            );
+            system_info_value_tag = 0;
+          };
+
+    - name: Configure RR (Radio Resource)
+      copy:
+        dest: /home/ubuntu/srsRAN_4G/config/rr.conf
+        owner: ubuntu
+        group: ubuntu
+        content: |
+          mac_cnfg = {
+            phr_cnfg = {
+              dl_pathloss_change = "dB3";
+              periodic_phr_timer = 50;
+              prohibit_phr_timer = 0;
+            };
+            ulsch_cnfg = {
+              max_harq_tx = 4;
+              periodic_bsr_timer = 20;
+              retx_bsr_timer = 320;
+            };
+            time_alignment_timer = -1;
+          };
+
+    - name: Configure DRB (Data Radio Bearer)
+      copy:
+        dest: /home/ubuntu/srsRAN_4G/config/drb.conf
+        owner: ubuntu
+        group: ubuntu
+        content: |
+          qci_config = (
+            {
+              qci = 9;
+              pdcp_config = {
+                discard_timer = -1;
+                pdcp_sn_size = 12;
+              };
+              rlc_config = {
+                ul_um = {
+                  sn_field_length = 10;
+                };
+                dl_um = {
+                  sn_field_length = 10;
+                  t_reordering = 45;
+                };
+              };
+              logical_channel_config = {
+                priority = 13;
+                prioritized_bit_rate = -1;
+                bucket_size_duration = 100;
+                log_chan_group = 2;
+              };
+            }
+          );
+
+    # ================================
+    #         Configure srsUE (User Equipment)
+    # ================================
+    - name: Configure UE for Open5GS EPC
+      copy:
+        dest: /home/ubuntu/srsRAN_4G/config/ue.conf
+        owner: ubuntu
+        group: ubuntu
+        content: |
+          [rat.eutra]
+          dl_earfcn = 2850
+
+          [usim]
+          mode = soft
+          algo = milenage
+          opc  = E8ED289DEBA952E4283B54E88E6183CA
+          k    = 465B5CE8B199B49FAA5F0A2EE238A6BC
+          imsi = 001010000000001
+          imei = 353490069873319
+
+          [rrc]
+          ue_category = 4
+
+          [nas]
+          apn = internet
+
+          [gw]
+          netns = ue1
+
+    # ================================
+    #         Create Startup Scripts
+    # ================================
+    - name: Create eNB startup script
+      copy:
+        dest: /home/ubuntu/start-enb.sh
+        mode: "0755"
+        owner: ubuntu
+        group: ubuntu
+        content: |
+          #!/bin/bash
+          cd /home/ubuntu/srsRAN_4G
+          sudo srsenb config/enb.conf
+
+    - name: Create UE startup script
+      copy:
+        dest: /home/ubuntu/start-ue.sh
+        mode: "0755"
+        owner: ubuntu
+        group: ubuntu
+        content: |
+          #!/bin/bash
+          cd /home/ubuntu/srsRAN_4G
+          sudo srsue config/ue.conf
+
+    - name: Display deployment complete message
+      debug:
+        msg: |
+          ✅ srsRAN 4G Deployment Complete!
+
+          To start eNB: sudo /home/ubuntu/start-enb.sh
+          To start UE:  sudo /home/ubuntu/start-ue.sh
+
+          Expected: UE attaches to eNB, gets IP from 10.45.0.0/16
