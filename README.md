@@ -1,20 +1,25 @@
 # DevOps 4G/5G Core on GCP - Infrastructure as Code
 
-**Project Title:** Cloud-Native 4G/5G Network Comparison with Network-as-Code  
+**Project Title:** Cloud-Native 4G/5G Network Comparison with Unified Monitoring  
 **Project ID:** `telecom5g-prod2`  
 **Cloud Zone:** `us-central1-a`  
 **Status:** ✅ Production-Ready | ⏱️ 45-60 minutes (full deployment) | 💰 ~$15/month
 
 **Architecture:**
 
-- **vm-core** (10.10.0.2): Open5GS 5GC + UERANSIM (5G NR)
-- **vm-4g-core** (10.10.0.3): Open5GS EPC + srsRAN (4G LTE)
+- **vm-core** (10.10.0.2) - **EXISTING**: Open5GS 5GC + UERANSIM + **Unified Prometheus + Grafana**
+- **vm-4g-core** (10.10.0.3) - **NEW**: Open5GS EPC + srsRAN (metrics sent to vm-core)
+
+**Unified Monitoring:**
+- Prometheus on vm-core scrapes metrics from **both** VMs
+- Grafana on vm-core visualizes 4G vs 5G performance side-by-side
+- Compare latency, throughput, UE attachment times in real-time
 
 ---
 
-## 🚀 Quick Start - Dual VM Deployment (4G + 5G)
+## 🚀 Quick Start - Keep Existing 5G, Add 4G
 
-**Note:** Two separate single-VM deployments for performance comparison.
+**Note:** Your existing vm-core stays unchanged. Only provision vm-4g-core for 4G comparison.
 
 For complete step-by-step deployment with UERANSIM fixes, see [PHASE-1-VM-Infrastructure.md](PHASE-1-VM-Infrastructure.md)
 
@@ -22,77 +27,127 @@ For DevOps automation, see [PHASE-2-VM-DevOps.md](PHASE-2-VM-DevOps.md)
 
 For monitoring setup, see [PHASE-3-VM-Monitoring.md](PHASE-3-VM-Monitoring.md)
 
-### Step 1: Provision Infrastructure with Terraform
+### Step 1: Provision NEW 4G VM Only (Keep Existing vm-core)
 
 ```bash
 cd terraform
 terraform init
-terraform plan
-terraform apply -auto-approve  # Creates vm-core only
+terraform plan  # Will show: vm-core (no changes), vm-4g-core (to be created)
+terraform apply -auto-approve  # Creates ONLY vm-4g-core
 ```
 
-### Step 2: Configure SSH Access
+### Step 2: Update Existing vm-core with Unified Monitoring
 
 ```bash
-# Disable OS Login
-gcloud compute instances add-metadata vm-core --zone=us-central1-a --metadata enable-oslogin=FALSE
+# SSH to vm-core and update Prometheus config
+cd ~/devops-5g-project
+git pull
 
-# Generate SSH key
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""
-
-# Add SSH key to VM
-gcloud compute instances add-metadata vm-core --zone=us-central1-a --metadata-from-file ssh-keys=<(echo "ubuntu:$(cat ~/.ssh/id_ed25519.pub)")
-
-# Wait and test
-sleep 30
-ssh -i ~/.ssh/id_ed25519 ubuntu@$(cd terraform && terraform output -raw vm_core_public_ip) "echo 'SSH works!'"
+# Re-run deploy-core.yml to add Grafana + update Prometheus
+cd ansible
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-core.yml -vv --tags monitoring
 ```
 
-### Step 3: Deploy Open5GS 5G Core
+### Step 3: Deploy 4G Core on vm-4g-core
 
 ```bash
-cd ../ansible
-ansible-playbook -i inventory/hosts.ini playbooks/deploy-core.yml -vv
+# Configure SSH for vm-4g-core
+gcloud compute instances add-metadata vm-4g-core --zone=us-central1-a --metadata enable-oslogin=FALSE
+gcloud compute instances add-metadata vm-4g-core --zone=us-central1-a --metadata-from-file ssh-keys=<(echo "ubuntu:$(cat ~/.ssh/id_ed25519.pub)")
+
+# Deploy Open5GS EPC + srsRAN
+cd ansible
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-4g-core.yml -vv
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-srsran.yml -vv
 ```
 
-### Step 4: Deploy UERANSIM (Same VM)
+### Step 4: Access Unified Monitoring Dashboard
 
 ```bash
-# No SSH setup needed - runs on same VM
-ansible-playbook -i inventory/hosts.ini playbooks/deploy-ueransim.yml -vv
+# Get vm-core public IP
+VM_CORE_IP=$(cd terraform && terraform output -raw vm_core_public_ip)
+
+# Access Grafana (admin/admin)
+echo "Grafana: http://$VM_CORE_IP:3000"
+echo "Prometheus: http://$VM_CORE_IP:9091"
 ```
 
-### Step 5: Test 5G Network
+**Grafana Setup:**
+1. Login: admin/admin (change password)
+2. Add Prometheus data source: http://localhost:9091
+3. Import dashboards for 4G vs 5G comparison
 
+### Step 5: Test Both Networks
+
+**5G Test (vm-core):**
 ```bash
-# SSH to vm-core
 gcloud compute ssh vm-core --zone=us-central1-a
 
 # Start gNB
 cd /home/ubuntu/UERANSIM
-sudo ./build/nr-gnb -c config/open5gs-gnb.yaml
+sudo ./build/nr-gnb -c config/open5gs-gnb.yaml &
 
-# In new terminal on vm-core, start UE
-sudo ./build/nr-ue -c config/open5gs-ue.yaml
+# Start UE (in same terminal)
+sudo ./build/nr-ue -c config/open5gs-ue.yaml &
 
-# In another terminal, test internet connectivity
+# Test internet connectivity
 sudo ping -I uesimtun0 -c 5 8.8.8.8
 ```
 
-**Expected Results:**
-
-- gNB: "NG Setup procedure is successful"
-- UE: "MM-REGISTERED/NORMAL-SERVICE"
-- Ping: 0% packet loss
-
-### Step 6: Deploy 4G Core (Optional - for comparison)
-
+**4G Test (vm-4g-core):**
 ```bash
-# Provision vm-4g-core (update terraform first)
-cd terraform
-terraform apply -auto-approve
+gcloud compute ssh vm-4g-core --zone=us-central1-a
 
-# Deploy Open5GS EPC (4G)
+# Start eNB
+sudo /home/ubuntu/start-enb.sh &
+
+# Start UE
+sudo /home/ubuntu/start-ue.sh &
+
+# Test connectivity
+sudo ip netns exec ue1 ping -c 5 8.8.8.8
+```
+
+**Expected Results:**
+- **5G**: gNB connected, UE registered, ping 0% loss, latency ~10-20ms
+- **4G**: eNB connected, UE attached, ping 0% loss, latency ~30-50ms
+
+---
+
+## 📊 Unified Monitoring - 4G vs 5G Comparison
+
+**Access Dashboards:**
+- **Grafana**: http://<vm-core-public-ip>:3000 (admin/admin)
+- **Prometheus**: http://<vm-core-public-ip>:9091
+
+**Metrics Collected:**
+
+| Metric | 5G (vm-core) | 4G (vm-4g-core) | Prometheus Job |
+|--------|--------------|-----------------|----------------|
+| Core Metrics | Open5GS 5GC | Open5GS EPC | `open5gs-5g` / `open5gs-4g` |
+| System Metrics | Node Exporter | Node Exporter | `node-5g` / `node-4g` |
+| Latency | uesimtun0 ping | ue1 netns ping | Manual test |
+| Throughput | iperf3 test | iperf3 test | Manual test |
+
+**Grafana Queries for Comparison:**
+
+```promql
+# 5G UE Count
+sum(open5gs_amf_session{instance="vm-core"})
+
+# 4G UE Count
+sum(open5gs_mme_session{instance="vm-4g-core"})
+
+# CPU Usage Comparison
+100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+
+# Network Traffic
+rate(node_network_receive_bytes_total[5m])
+```
+
+---
+
+## 🚨 Quick Fix Reference
 cd ../ansible
 ansible-playbook -i inventory/hosts.ini playbooks/deploy-4g-core.yml -vv
 

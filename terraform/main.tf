@@ -61,13 +61,15 @@ resource "google_compute_firewall" "allow_ssh" {
 }
 
 # ================================
-#         VM Core (5G Control Plane)
+#         VM Core (5G Control Plane) - EXISTING, DO NOT RECREATE
 # ================================
+# This VM already exists with Open5GS 5GC + UERANSIM deployed
+# Hosts unified Prometheus + Grafana for monitoring both 4G and 5G
 resource "google_compute_instance" "vm_core" {
   name         = "vm-core"
   machine_type = "e2-medium"  # CRITICAL: 2vCPU, 4GB RAM minimum for stability
   zone         = "${var.region}-a"
-  description  = "5G Core Network - Open5GS 5GC + UERANSIM RAN"
+  description  = "5G Core + Unified Monitoring - Open5GS 5GC + UERANSIM + Prometheus + Grafana"
 
   boot_disk {
     initialize_params {
@@ -82,7 +84,7 @@ resource "google_compute_instance" "vm_core" {
     network_ip = "10.10.0.2"
 
     access_config {
-      # Public IP for SSH access
+      # Public IP for SSH, Prometheus (9091), Grafana (3000)
     }
   }
 
@@ -90,17 +92,21 @@ resource "google_compute_instance" "vm_core" {
     enable-oslogin = "true"
   }
 
-  tags = ["open5gs", "5g-core"]
+  tags = ["open5gs", "5g-core", "monitoring"]
+  
+  lifecycle {
+    prevent_destroy = true  # Protect existing VM from accidental deletion
+  }
 }
 
 # ================================
-#         VM 4G Core (EPC)
+#         VM 4G Core (EPC) - NEW VM ONLY
 # ================================
 resource "google_compute_instance" "vm_4g_core" {
   name         = "vm-4g-core"
   machine_type = "e2-medium"  # 2vCPU, 4GB RAM for 4G EPC
   zone         = "${var.region}-a"
-  description  = "4G Core Network - Open5GS EPC + srsRAN"
+  description  = "4G Core Network - Open5GS EPC + srsRAN (metrics sent to vm-core)"
 
   boot_disk {
     initialize_params {
@@ -125,4 +131,7 @@ resource "google_compute_instance" "vm_4g_core" {
 
   tags = ["open5gs", "4g-core"]
 }
+
+# ================================
+#         Outputs
 # ================================

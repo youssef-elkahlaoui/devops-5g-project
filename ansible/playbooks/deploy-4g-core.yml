@@ -243,39 +243,39 @@
       ignore_errors: yes
 
     # ================================
-    #         Prometheus Setup
+    #         Node Exporter for System Metrics
     # ================================
-    - name: Download Prometheus
-      unarchive:
-        src: https://github.com/prometheus/prometheus/releases/download/v2.47.0/prometheus-2.47.0.linux-amd64.tar.gz
-        dest: /opt
-        remote_src: yes
-        creates: /opt/prometheus-2.47.0.linux-amd64
+    - name: Install Node Exporter
+      apt:
+        name: prometheus-node-exporter
+        state: present
+        update_cache: yes
 
-    - name: Create Prometheus systemd service (port 9091)
-      copy:
-        dest: /etc/systemd/system/prometheus.service
-        content: |
-          [Unit]
-          Description=Prometheus
-          After=network.target
-
-          [Service]
-          Type=simple
-          User=root
-          ExecStart=/opt/prometheus-2.47.0.linux-amd64/prometheus --config.file=/opt/prometheus-2.47.0.linux-amd64/prometheus.yml --web.listen-address=0.0.0.0:9091
-          Restart=on-failure
-
-          [Install]
-          WantedBy=multi-user.target
-
-    - name: Enable and start Prometheus
+    - name: Enable and start Node Exporter
       systemd:
-        name: prometheus
-        state: restarted
+        name: prometheus-node-exporter
+        state: started
         enabled: yes
-        daemon_reload: yes
+
+    # ================================
+    #         Configure Open5GS Metrics Exporter
+    # ================================
+    - name: Ensure Open5GS metrics are exposed on port 9090
+      shell: |
+        # Open5GS already exposes metrics on 9090, just verify firewall allows it
+        iptables -I INPUT -p tcp --dport 9090 -j ACCEPT
+        iptables -I INPUT -p tcp --dport 9100 -j ACCEPT
+        iptables-save > /etc/iptables/rules.v4
+      ignore_errors: yes
 
     - name: Display deployment complete message
       debug:
-        msg: "✅ Open5GS 4G EPC Deployment Complete! MME: 10.10.0.3, PGW: 10.10.0.3, Prometheus: http://<public-ip>:9091"
+        msg: |
+          ✅ Open5GS 4G EPC Deployment Complete!
+          
+          Services: MME, SGW-C, SGW-U, PGW, HSS, PCRF
+          Metrics: Sent to vm-core Prometheus
+            - Open5GS metrics: 10.10.0.3:9090
+            - Node exporter: 10.10.0.3:9100
+          
+          Access Grafana on vm-core to view 4G metrics!

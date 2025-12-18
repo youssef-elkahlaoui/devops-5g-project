@@ -245,22 +245,59 @@
         group: prometheus
         mode: "0755"
 
-    - name: Fix Prometheus configuration
+    - name: Configure unified Prometheus for 5G + 4G monitoring
       shell: |
-        # Ensure minimal valid Prometheus config exists
+        # Unified Prometheus config - scrapes both vm-core (5G) and vm-4g-core (4G)
         cat > /etc/prometheus/prometheus.yml <<EOF
         global:
           scrape_interval: 15s
           evaluation_interval: 15s
+          external_labels:
+            cluster: 'telecom-5g-4g'
+            environment: 'production'
 
         scrape_configs:
+          # Prometheus self-monitoring
           - job_name: 'prometheus'
             static_configs:
-              - targets: ['localhost:9090']
+              - targets: ['localhost:9091']
+                labels:
+                  instance: 'vm-core'
+                  type: 'monitoring'
           
-          - job_name: 'open5gs'
+          # Open5GS 5G Core metrics (vm-core)
+          - job_name: 'open5gs-5g'
             static_configs:
               - targets: ['localhost:9090']
+                labels:
+                  instance: 'vm-core'
+                  network: '5g'
+                  core_type: '5gc'
+          
+          # Open5GS 4G EPC metrics (vm-4g-core)
+          - job_name: 'open5gs-4g'
+            static_configs:
+              - targets: ['10.10.0.3:9090']
+                labels:
+                  instance: 'vm-4g-core'
+                  network: '4g'
+                  core_type: 'epc'
+          
+          # Node exporter for system metrics (vm-core)
+          - job_name: 'node-5g'
+            static_configs:
+              - targets: ['localhost:9100']
+                labels:
+                  instance: 'vm-core'
+                  network: '5g'
+          
+          # Node exporter for system metrics (vm-4g-core)
+          - job_name: 'node-4g'
+            static_configs:
+              - targets: ['10.10.0.3:9100']
+                labels:
+                  instance: 'vm-4g-core'
+                  network: '4g'
         EOF
 
         # Fix ownership and permissions
@@ -312,31 +349,104 @@
         enabled: yes
       ignore_errors: yes
 
+    # ================================
+    #         Node Exporter for System Metrics
+    # ================================
+    - name: Install Node Exporter
+      apt:
+        name: prometheus-node-exporter
+        state: present
+        update_cache: yes
+
+    - name: Enable and start Node Exporter
+      systemd:
+        name: prometheus-node-exporter
+        state: started
+        enabled: yes
+
+    # ================================
+    #         Grafana Installation
+    # ================================
+    - name: Install Grafana dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - software-properties-common
+        state: present
+
+    - name: Add Grafana GPG key
+      shell: |
+        wget -q -O - https://packages.grafana.com/gpg.key | gpg --dearmor | tee /usr/share/keyrings/grafana.gpg > /dev/null
+      args:
+        creates: /usr/share/keyrings/grafana.gpg
+
+    - name: Add Grafana repository
+      apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/grafana.gpg] https://packages.grafana.com/oss/deb stable main"
+        state: present
+        filename: grafana
+
+    - name: Install Grafana
+      apt:
+        name: grafana
+        state: present
+        update_cache: yes
+
+    - name: Configure Grafana to bind to 0.0.0.0
+      lineinfile:
+        path: /etc/grafana/grafana.ini
+        regexp: '^;http_addr ='
+        line: 'http_addr = 0.0.0.0'
+        backrefs: yes
+
+    - name: Enable and start Grafana
+      systemd:
+        name: grafana-server
+        state: started
+        enabled: yes
+
+    - name: Wait for Grafana to be ready
+      wait_for:
+        port: 3000
+        delay: 5
+        timeout: 30
+
     - name: Display SSH public key for manual setup (if needed)
       shell: cat /root/.ssh/id_ed25519.pub
       register: ssh_pubkey
       ignore_errors: yes
 
-    - name: Deployment Complete - Ready for UERANSIM
+    - name: Deployment Complete - Unified Monitoring Ready
       debug:
         msg: |
           ====================================
-          Open5GS Core Network Deployment ✅
+          Open5GS 5G Core + Unified Monitoring ✅
           ====================================
 
           All services running:
           - MongoDB: mongod
-          - Open5GS: nrfd, amfd, smfd, upfd, udmd, udrd, pcfd, ausfd
-          - Prometheus: port 9091
+          - Open5GS 5G: nrfd, amfd, smfd, upfd, udmd, udrd, pcfd, ausfd
+          - Prometheus: port 9091 (scrapes both 5G and 4G)
+          - Grafana: port 3000 (admin/admin)
+          - Node Exporter: port 9100
           - WebUI: port 9999
 
           ====================================
-          SSH Setup for vm-core → vm-ran:
+          Unified Monitoring Dashboard:
           ====================================
-          SSH key for root user created.
+          Prometheus: http://<vm-core-ip>:9091
+          Grafana: http://<vm-core-ip>:3000
+          
+          Grafana will show metrics from:
+            - vm-core (5G): Open5GS 5GC + UERANSIM
+            - vm-4g-core (4G): Open5GS EPC + srsRAN
 
           Next: Deploy UERANSIM with:
             ansible-playbook -i inventory/hosts.ini playbooks/deploy-ueransim.yml
+
+          Then: Deploy 4G on vm-4g-core with:
+            ansible-playbook -i inventory/hosts.ini playbooks/deploy-4g-core.yml
+            ansible-playbook -i inventory/hosts.ini playbooks/deploy-srsran.yml
 
           ===================================="
 
@@ -347,4 +457,4 @@
 
     - name: Configuration complete
       debug:
-        msg: "✅ Open5GS core deployment completed. All 5G core functions installed: NRF, AMF, SMF, UPF, UDM, UDR, PCF, AUSF. WebUI available at http://localhost:3000"
+        msg: "✅ Open5GS 5G core deployment completed with unified monitoring. Prometheus + Grafana ready to monitor both 4G and 5G networks."
