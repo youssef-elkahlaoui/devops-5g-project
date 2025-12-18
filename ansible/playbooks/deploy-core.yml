@@ -395,8 +395,8 @@
     - name: Configure Grafana to bind to 0.0.0.0
       lineinfile:
         path: /etc/grafana/grafana.ini
-        regexp: '^;http_addr ='
-        line: 'http_addr = 0.0.0.0'
+        regexp: "^;http_addr ="
+        line: "http_addr = 0.0.0.0"
         backrefs: yes
 
     - name: Enable and start Grafana
@@ -436,7 +436,7 @@
           ====================================
           Prometheus: http://<vm-core-ip>:9091
           Grafana: http://<vm-core-ip>:3000
-          
+
           Grafana will show metrics from:
             - vm-core (5G): Open5GS 5GC + UERANSIM
             - vm-4g-core (4G): Open5GS EPC + srsRAN

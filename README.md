@@ -11,6 +11,7 @@
 - **vm-4g-core** (10.10.0.3) - **NEW**: Open5GS EPC + srsRAN (metrics sent to vm-core)
 
 **Unified Monitoring:**
+
 - Prometheus on vm-core scrapes metrics from **both** VMs
 - Grafana on vm-core visualizes 4G vs 5G performance side-by-side
 - Compare latency, throughput, UE attachment times in real-time
@@ -73,6 +74,7 @@ echo "Prometheus: http://$VM_CORE_IP:9091"
 ```
 
 **Grafana Setup:**
+
 1. Login: admin/admin (change password)
 2. Add Prometheus data source: http://localhost:9091
 3. Import dashboards for 4G vs 5G comparison
@@ -80,6 +82,7 @@ echo "Prometheus: http://$VM_CORE_IP:9091"
 ### Step 5: Test Both Networks
 
 **5G Test (vm-core):**
+
 ```bash
 gcloud compute ssh vm-core --zone=us-central1-a
 
@@ -95,6 +98,7 @@ sudo ping -I uesimtun0 -c 5 8.8.8.8
 ```
 
 **4G Test (vm-4g-core):**
+
 ```bash
 gcloud compute ssh vm-4g-core --zone=us-central1-a
 
@@ -109,6 +113,7 @@ sudo ip netns exec ue1 ping -c 5 8.8.8.8
 ```
 
 **Expected Results:**
+
 - **5G**: gNB connected, UE registered, ping 0% loss, latency ~10-20ms
 - **4G**: eNB connected, UE attached, ping 0% loss, latency ~30-50ms
 
@@ -117,17 +122,18 @@ sudo ip netns exec ue1 ping -c 5 8.8.8.8
 ## 📊 Unified Monitoring - 4G vs 5G Comparison
 
 **Access Dashboards:**
+
 - **Grafana**: http://<vm-core-public-ip>:3000 (admin/admin)
 - **Prometheus**: http://<vm-core-public-ip>:9091
 
 **Metrics Collected:**
 
-| Metric | 5G (vm-core) | 4G (vm-4g-core) | Prometheus Job |
-|--------|--------------|-----------------|----------------|
-| Core Metrics | Open5GS 5GC | Open5GS EPC | `open5gs-5g` / `open5gs-4g` |
-| System Metrics | Node Exporter | Node Exporter | `node-5g` / `node-4g` |
-| Latency | uesimtun0 ping | ue1 netns ping | Manual test |
-| Throughput | iperf3 test | iperf3 test | Manual test |
+| Metric         | 5G (vm-core)   | 4G (vm-4g-core) | Prometheus Job              |
+| -------------- | -------------- | --------------- | --------------------------- |
+| Core Metrics   | Open5GS 5GC    | Open5GS EPC     | `open5gs-5g` / `open5gs-4g` |
+| System Metrics | Node Exporter  | Node Exporter   | `node-5g` / `node-4g`       |
+| Latency        | uesimtun0 ping | ue1 netns ping  | Manual test                 |
+| Throughput     | iperf3 test    | iperf3 test     | Manual test                 |
 
 **Grafana Queries for Comparison:**
 
@@ -148,12 +154,15 @@ rate(node_network_receive_bytes_total[5m])
 ---
 
 ## 🚨 Quick Fix Reference
+
 cd ../ansible
 ansible-playbook -i inventory/hosts.ini playbooks/deploy-4g-core.yml -vv
 
 # Deploy srsRAN (4G RAN simulator)
+
 ansible-playbook -i inventory/hosts.ini playbooks/deploy-srsran.yml -vv
-```
+
+````
 
 ### Step 7: Test 4G Network
 
@@ -169,7 +178,7 @@ sudo /home/ubuntu/start-ue.sh
 
 # Test connectivity (in third terminal)
 sudo ip netns exec ue1 ping -c 5 8.8.8.8
-```
+````
 
 **Expected Results:**
 

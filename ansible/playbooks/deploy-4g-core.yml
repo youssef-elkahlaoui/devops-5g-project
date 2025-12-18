@@ -272,10 +272,10 @@
       debug:
         msg: |
           ✅ Open5GS 4G EPC Deployment Complete!
-          
+
           Services: MME, SGW-C, SGW-U, PGW, HSS, PCRF
           Metrics: Sent to vm-core Prometheus
             - Open5GS metrics: 10.10.0.3:9090
             - Node exporter: 10.10.0.3:9100
-          
+
           Access Grafana on vm-core to view 4G metrics!
