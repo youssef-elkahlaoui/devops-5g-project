@@ -43,7 +43,7 @@ resource "google_compute_instance" "vm1_4g_core" {
     enable-oslogin = "true"
   }
 
-  tags = ["open5gs", "4g-core", "srsran"]
+  tags = ["open5gs", "core-4g", "srsran"]
 
   service_account {
     scopes = ["cloud-platform"]
