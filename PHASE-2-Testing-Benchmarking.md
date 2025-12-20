@@ -18,14 +18,14 @@ This phase proves the core thesis: **5G is fundamentally different from 4G from 
 
 ### The Core Difference
 
-| Aspect | 4G (srsRAN on VM1) | 5G (UERANSIM on VM2) |
-|--------|-------------------|---------------------|
-| **Simulation Level** | Physical Layer (Layer 1) | Protocol Layer (Layer 3) |
-| **What's Simulated** | Radio waves, modulation, fading | Network messages only |
-| **CPU Impact** | 🔴 80-100% (radio math) | 🟢 <10% (message passing) |
-| **Throughput** | ~30 Mbps (CPU-limited) | ~500 Mbps (network-limited) |
-| **Latency** | ~35ms (processing delay) | ~10ms (minimal processing) |
-| **Cloud Suitability** | ❌ Requires DSP hardware | ✅ Cloud-native ready |
+| Aspect                | 4G (srsRAN on VM1)              | 5G (UERANSIM on VM2)        |
+| --------------------- | ------------------------------- | --------------------------- |
+| **Simulation Level**  | Physical Layer (Layer 1)        | Protocol Layer (Layer 3)    |
+| **What's Simulated**  | Radio waves, modulation, fading | Network messages only       |
+| **CPU Impact**        | 🔴 80-100% (radio math)         | 🟢 <10% (message passing)   |
+| **Throughput**        | ~30 Mbps (CPU-limited)          | ~500 Mbps (network-limited) |
+| **Latency**           | ~35ms (processing delay)        | ~10ms (minimal processing)  |
+| **Cloud Suitability** | ❌ Requires DSP hardware        | ✅ Cloud-native ready       |
 
 ### Golden Rule
 
@@ -103,6 +103,7 @@ exit
 ### 1.4 Import 4G vs 5G Dashboard
 
 In Grafana:
+
 1. Navigate to **Dashboards → Import**
 2. Dashboard JSON should already exist at `/var/lib/grafana/dashboards/4g-vs-5g.json`
 3. Or create new dashboard with these panels:
@@ -206,6 +207,7 @@ sudo ip netns exec ue1 iperf3 -c iperf.he.net -t 60
 **Open Grafana Dashboard** (http://$VM3_IP:3000)
 
 Watch these metrics during 4G test:
+
 - **VM1 CPU Usage**: Should spike to **80-100%**
 - **VM1 Network Throughput**: Limited to **~30 Mbps**
 - **VM1 Memory**: Moderate usage (~40%)
@@ -229,15 +231,15 @@ ps aux | grep -E "srsenb|srsue"
 
 ### 2.7 Record 4G Baseline Metrics
 
-| Metric | Value | Notes |
-|--------|-------|-------|
-| Registration Time | ~30-40 seconds | UE attach to network |
-| Average Latency | 25-40 ms | Ping to 8.8.8.8 |
-| Peak Throughput | 20-35 Mbps | CPU-limited |
-| CPU Usage | 80-100% | Physical layer simulation |
-| Memory Usage | ~40% | |
-| Jitter | 8-15 ms | Latency variation |
-| Packet Loss | <1% | |
+| Metric            | Value          | Notes                     |
+| ----------------- | -------------- | ------------------------- |
+| Registration Time | ~30-40 seconds | UE attach to network      |
+| Average Latency   | 25-40 ms       | Ping to 8.8.8.8           |
+| Peak Throughput   | 20-35 Mbps     | CPU-limited               |
+| CPU Usage         | 80-100%        | Physical layer simulation |
+| Memory Usage      | ~40%           |                           |
+| Jitter            | 8-15 ms        | Latency variation         |
+| Packet Loss       | <1%            |                           |
 
 **✅ Checkpoint:** 4G network tested, metrics recorded
 
@@ -327,6 +329,7 @@ sudo iperf3 -c iperf.he.net -B 10.45.0.2 -t 60
 **Open Grafana Dashboard** (http://$VM3_IP:3000)
 
 Watch these metrics during 5G test:
+
 - **VM2 CPU Usage**: Should remain **<10%**
 - **VM2 Network Throughput**: Can reach **~500 Mbps**
 - **VM2 Memory**: Low usage (~20%)
@@ -350,15 +353,15 @@ ps aux | grep -E "nr-gnb|nr-ue"
 
 ### 3.7 Record 5G Baseline Metrics
 
-| Metric | Value | Notes |
-|--------|-------|-------|
+| Metric            | Value          | Notes                      |
+| ----------------- | -------------- | -------------------------- |
 | Registration Time | ~10-15 seconds | UE registration to network |
-| Average Latency | 8-12 ms | Ping to 8.8.8.8 |
-| Peak Throughput | 200-500 Mbps | Network-limited |
-| CPU Usage | <10% | Protocol layer only |
-| Memory Usage | ~20% | |
-| Jitter | 2-3 ms | Latency variation |
-| Packet Loss | <0.1% | |
+| Average Latency   | 8-12 ms        | Ping to 8.8.8.8            |
+| Peak Throughput   | 200-500 Mbps   | Network-limited            |
+| CPU Usage         | <10%           | Protocol layer only        |
+| Memory Usage      | ~20%           |                            |
+| Jitter            | 2-3 ms         | Latency variation          |
+| Packet Loss       | <0.1%          |                            |
 
 **✅ Checkpoint:** 5G network tested, metrics recorded
 
@@ -368,14 +371,14 @@ ps aux | grep -E "nr-gnb|nr-ue"
 
 ### 4.1 Side-by-Side Comparison
 
-| Metric | 4G (VM1) | 5G (VM2) | Difference | Winner |
-|--------|----------|----------|------------|--------|
-| **Registration Time** | 30-40s | 10-15s | 2-3x faster | 🏆 5G |
-| **Latency (avg)** | 35ms | 10ms | 3.5x lower | 🏆 5G |
-| **Throughput** | 30 Mbps | 500 Mbps | 16x higher | 🏆 5G |
-| **CPU Usage** | 80-100% | <10% | 10x more efficient | 🏆 5G |
-| **Jitter** | 12ms | 2ms | 6x more stable | 🏆 5G |
-| **Packet Loss** | <1% | <0.1% | 10x more reliable | 🏆 5G |
+| Metric                | 4G (VM1) | 5G (VM2) | Difference         | Winner |
+| --------------------- | -------- | -------- | ------------------ | ------ |
+| **Registration Time** | 30-40s   | 10-15s   | 2-3x faster        | 🏆 5G  |
+| **Latency (avg)**     | 35ms     | 10ms     | 3.5x lower         | 🏆 5G  |
+| **Throughput**        | 30 Mbps  | 500 Mbps | 16x higher         | 🏆 5G  |
+| **CPU Usage**         | 80-100%  | <10%     | 10x more efficient | 🏆 5G  |
+| **Jitter**            | 12ms     | 2ms      | 6x more stable     | 🏆 5G  |
+| **Packet Loss**       | <1%      | <0.1%    | 10x more reliable  | 🏆 5G  |
 
 ### 4.2 The Architectural Insight
 
@@ -409,24 +412,28 @@ ps aux | grep -E "nr-gnb|nr-ue"
 **In Grafana, create a new dashboard with these panels:**
 
 #### Panel 1: CPU Usage Comparison
+
 ```promql
 Query A (4G): rate(node_cpu_seconds_total{instance="10.10.0.10:9100",mode="user"}[1m]) * 100
 Query B (5G): rate(node_cpu_seconds_total{instance="10.10.0.20:9100",mode="user"}[1m]) * 100
 ```
 
 #### Panel 2: Memory Usage Comparison
+
 ```promql
 Query A (4G): (1 - (node_memory_MemAvailable_bytes{instance="10.10.0.10:9100"} / node_memory_MemTotal_bytes{instance="10.10.0.10:9100"})) * 100
 Query B (5G): (1 - (node_memory_MemAvailable_bytes{instance="10.10.0.20:9100"} / node_memory_MemTotal_bytes{instance="10.10.0.20:9100"})) * 100
 ```
 
 #### Panel 3: Network Throughput Comparison
+
 ```promql
 Query A (4G): rate(node_network_receive_bytes_total{instance="10.10.0.10:9100",device!~"lo|docker.*"}[1m])
 Query B (5G): rate(node_network_receive_bytes_total{instance="10.10.0.20:9100",device!~"lo|docker.*"}[1m])
 ```
 
 #### Panel 4: Active Sessions
+
 ```promql
 Query A (4G): open5gs_session_count{instance="10.10.0.10:9090"}
 Query B (5G): open5gs_session_count{instance="10.10.0.20:9090"}
@@ -520,9 +527,11 @@ Create `TEST-RESULTS-SUMMARY.md`:
 # 4G vs 5G Test Results Summary
 
 ## Test Date
+
 December 20, 2025
 
 ## Environment
+
 - Cloud: Google Cloud Platform
 - Region: us-central1-a
 - VM1 (4G): e2-medium (2 vCPU, 4GB RAM)
@@ -532,21 +541,25 @@ December 20, 2025
 ## Performance Summary
 
 ### Latency
+
 - 4G Average: 35ms (min: 25ms, max: 45ms, jitter: 12ms)
 - 5G Average: 10ms (min: 8ms, max: 12ms, jitter: 2ms)
 - **Result: 5G is 3.5x faster with 6x lower jitter**
 
 ### Throughput
+
 - 4G Average: 28 Mbps (CPU-limited)
 - 5G Average: 480 Mbps (network-limited)
 - **Result: 5G is 17x faster**
 
 ### Resource Usage
+
 - 4G CPU: 85-95% (physical layer simulation)
 - 5G CPU: 5-8% (protocol layer only)
 - **Result: 5G is 11x more efficient**
 
 ### Reliability
+
 - 4G Packet Loss: 0.8%
 - 5G Packet Loss: 0.05%
 - **Result: 5G is 16x more reliable**
@@ -560,12 +573,13 @@ December 20, 2025
 
 ## Conclusion
 
-This test demonstrates that 5G's architectural redesign makes it fundamentally 
-more suitable for cloud deployment than 4G. The shift from physical layer to 
-protocol layer simulation in testing reflects the real-world shift from 
+This test demonstrates that 5G's architectural redesign makes it fundamentally
+more suitable for cloud deployment than 4G. The shift from physical layer to
+protocol layer simulation in testing reflects the real-world shift from
 hardware-dependent to software-defined networking.
 
 ## Grafana Dashboard
+
 See attached: 4g-vs-5g-comparison.json
 ```
 
@@ -607,6 +621,7 @@ ssh ubuntu@$VM3_IP "bash /home/ubuntu/test-vm3-monitoring.sh"
 ### 4G Issues (VM1)
 
 **Problem:** eNB won't start
+
 ```bash
 # Check MME is accessible
 sudo netstat -tlnup | grep 36412
@@ -615,6 +630,7 @@ sudo systemctl restart open5gs-mmed
 ```
 
 **Problem:** UE can't attach
+
 ```bash
 # Check subscriber exists
 mongosh open5gs --eval "db.subscribers.find({imsi: '001010000000001'})"
@@ -624,6 +640,7 @@ mongosh open5gs --eval "db.subscribers.find({imsi: '001010000000001'})"
 ### 5G Issues (VM2)
 
 **Problem:** gNB shows "NG Setup Failure"
+
 ```bash
 # Check AMF is accessible
 sudo systemctl status open5gs-amfd
@@ -634,6 +651,7 @@ sudo systemctl restart open5gs-amfd
 ```
 
 **Problem:** UE registration fails
+
 ```bash
 # Check subscriber exists
 mongosh open5gs --eval "db.subscribers.find({imsi: '999700000000001'})"
@@ -645,6 +663,7 @@ sudo journalctl -u open5gs-amfd | grep -i "slice"
 ### Monitoring Issues (VM3)
 
 **Problem:** Prometheus targets DOWN
+
 ```bash
 # Check connectivity to VM1
 ping 10.10.0.10
@@ -659,6 +678,7 @@ gcloud compute firewall-rules list --filter="network:open5gs-vpc"
 ```
 
 **Problem:** Grafana shows "No Data"
+
 ```bash
 # Check Prometheus is scraping
 curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[].health'
