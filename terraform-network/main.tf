@@ -14,7 +14,7 @@ provider "google" {
 }
 
 # ================================
-#         VPC Network
+#          VPC Network
 # ================================
 resource "google_compute_network" "open5gs_vpc" {
   name                    = "open5gs-vpc"
@@ -32,7 +32,7 @@ resource "google_compute_subnetwork" "control_subnet" {
 }
 
 # ================================
-#         Firewall Rules
+#          Firewall Rules
 # ================================
 
 # Allow SSH from anywhere
@@ -47,7 +47,8 @@ resource "google_compute_firewall" "allow_ssh" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["open5gs", "4g-core", "5g-core", "monitoring"]
+  # FIXED TAGS
+  target_tags   = ["open5gs", "core-4g", "core-5g", "monitoring"]
 }
 
 # Allow all internal communication within VPC
@@ -75,7 +76,7 @@ resource "google_compute_firewall" "allow_sctp" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["4g-core", "5g-core"]
+  target_tags   = ["core-4g", "core-5g"]
 }
 
 # Allow GTP-U for user plane traffic
@@ -90,7 +91,7 @@ resource "google_compute_firewall" "allow_gtpu" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["4g-core", "5g-core"]
+  target_tags   = ["core-4g", "core-5g"]
 }
 
 # Allow HTTP/2 for 5G SBI (Service Based Interface)
@@ -105,7 +106,7 @@ resource "google_compute_firewall" "allow_sbi" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["5g-core"]
+  target_tags   = ["core-5g"]
 }
 
 # Allow Diameter for 4G (S6a, Gx interfaces)
@@ -120,7 +121,7 @@ resource "google_compute_firewall" "allow_diameter" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["4g-core"]
+  target_tags   = ["core-4g"]
 }
 
 # Allow WebUI access (port 9999)
@@ -135,7 +136,7 @@ resource "google_compute_firewall" "allow_webui" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["4g-core", "5g-core"]
+  target_tags   = ["core-4g", "core-5g"]
 }
 
 # Allow Prometheus/Grafana/Node Exporter
@@ -150,7 +151,7 @@ resource "google_compute_firewall" "allow_monitoring" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["monitoring", "4g-core", "5g-core"]
+  target_tags   = ["monitoring", "core-4g", "core-5g"]
 }
 
 # Allow PFCP for 4G SGW-C/SGW-U and 5G SMF/UPF
@@ -165,7 +166,7 @@ resource "google_compute_firewall" "allow_pfcp" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["4g-core", "5g-core"]
+  target_tags   = ["core-4g", "core-5g"]
 }
 
 # Allow GTP-C for control plane
@@ -180,7 +181,7 @@ resource "google_compute_firewall" "allow_gtpc" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["4g-core", "5g-core"]
+  target_tags   = ["core-4g", "core-5g"]
 }
 
 # Allow MongoDB
@@ -195,13 +196,12 @@ resource "google_compute_firewall" "allow_mongodb" {
   }
 
   source_ranges = ["10.10.0.0/24"]
-  target_tags   = ["4g-core", "5g-core"]
+  target_tags   = ["core-4g", "core-5g"]
 }
 
 # ================================
-#         Cloud NAT
+#          Cloud NAT
 # ================================
-# Required for VMs to access internet for package downloads
 
 resource "google_compute_router" "open5gs_router" {
   name    = "open5gs-router"
