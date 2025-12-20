@@ -130,11 +130,15 @@ terraform output vm1_public_ip
 
 ```bash
 # Get VM1 IP
-$VM1_IP = (terraform output -raw vm1_public_ip)
+export VM1_IP=$(terraform output -raw vm1_public_ip)
+
 Write-Host "VM1 Public IP: $VM1_IP"
 
+export VM1_Name="vm1-4g-core"
+
 # Test SSH connection
-ssh ubuntu@$VM1_IP "echo 'VM1 SSH successful'"
+
+gcloud compute ssh [Name of your machine]@$VM1_Name --zone='us-central1-a'
 ```
 
 ### 2.3 Deploy 4G Software Stack
