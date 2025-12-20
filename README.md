@@ -1,690 +1,157 @@
-# DevOps 4G/5G Core on GCP - Infrastructure as Code
+# DevOps 4G/5G Core Network Deployment on GCP
+## 3-VM Architecture: Isolated 4G, 5G, and Centralized Monitoring
 
-**Project Title:** Cloud-Native 4G/5G Network Comparison with Unified Monitoring  
-**Project ID:** `telecom5g-prod2`  
-**Cloud Zone:** `us-central1-a`  
-**Status:** ✅ Production-Ready | ⏱️ 45-60 minutes (full deployment) | 💰 ~$15/month
-
-**Architecture:**
-
-- **vm-core** (10.10.0.2) - **EXISTING**: Open5GS 5GC + UERANSIM + **Unified Prometheus + Grafana**
-- **vm-4g-core** (10.10.0.3) - **NEW**: Open5GS EPC + srsRAN (metrics sent to vm-core)
-
-**Unified Monitoring:**
-
-- Prometheus on vm-core scrapes metrics from **both** VMs
-- Grafana on vm-core visualizes 4G vs 5G performance side-by-side
-- Compare latency, throughput, UE attachment times in real-time
+**Project Status:**  Production-Ready |  60-90 minutes (full deployment) |  ~$20/month  
+**Cloud Provider:** Google Cloud Platform (GCP)  
+**Region:** us-central1-a  
+**Project ID:** telecom5g-prod2
 
 ---
 
-## 🚀 Quick Start - Keep Existing 5G, Add 4G
+##  Project Overview
 
-**Note:** Your existing vm-core stays unchanged. Only provision vm-4g-core for 4G comparison.
+This project deploys a complete 4G and 5G core network infrastructure on GCP with **3 dedicated VMs**, enabling side-by-side performance comparison and analysis.
 
-For complete step-by-step deployment with UERANSIM fixes, see [PHASE-1-VM-Infrastructure.md](PHASE-1-VM-Infrastructure.md)
+### Architecture
 
-For DevOps automation, see [PHASE-2-VM-DevOps.md](PHASE-2-VM-DevOps.md)
-
-For monitoring setup, see [PHASE-3-VM-Monitoring.md](PHASE-3-VM-Monitoring.md)
-
-### Step 1: Provision NEW 4G VM Only (Keep Existing vm-core)
-
-```bash
-cd terraform
-terraform init
-terraform plan  # Will show: vm-core (no changes), vm-4g-core (to be created)
-terraform apply -auto-approve  # Creates ONLY vm-4g-core
 ```
 
-### Step 2: Update Existing vm-core with Unified Monitoring
+                          GCP VPC: open5gs-vpc                         
+                         Subnet: 10.10.0.0/24                          
 
-```bash
-# SSH to vm-core and update Prometheus config
-cd ~/devops-5g-project
-git pull
+  -      
+     VM1 (4G Core)        VM2 (5G Core)       VM3 (Monitoring)   
+     10.10.0.10           10.10.0.20           10.10.0.30        
+        
+   Open5GS EPC          Open5GS 5GC          Prometheus          
+   srsRAN eNB/UE        UERANSIM gNB/UE      Grafana             
+   MongoDB              MongoDB              Node Exporter       
+   WebUI:9999           WebUI:9999                               
+   Metrics:9090         Metrics:9090         Scrapes from:       
+   Node Exp:9100        Node Exp:9100         VM1 & VM2          
+        
 
-# Re-run deploy-core.yml to add Grafana + update Prometheus
-cd ansible
-ansible-playbook -i inventory/hosts.ini playbooks/deploy-core.yml -vv --tags monitoring
 ```
 
-### Step 3: Deploy 4G Core on vm-4g-core
-
-```bash
-# Configure SSH for vm-4g-core
-gcloud compute instances add-metadata vm-4g-core --zone=us-central1-a --metadata enable-oslogin=FALSE
-gcloud compute instances add-metadata vm-4g-core --zone=us-central1-a --metadata-from-file ssh-keys=<(echo "ubuntu:$(cat ~/.ssh/id_ed25519.pub)")
-
-# Deploy Open5GS EPC + srsRAN
-cd ansible
-ansible-playbook -i inventory/hosts.ini playbooks/deploy-4g-core.yml -vv
-ansible-playbook -i inventory/hosts.ini playbooks/deploy-srsran.yml -vv
-```
-
-### Step 4: Access Unified Monitoring Dashboard
-
-```bash
-# Get vm-core public IP
-VM_CORE_IP=$(cd terraform && terraform output -raw vm_core_public_ip)
-
-# Access Grafana (admin/admin)
-echo "Grafana: http://$VM_CORE_IP:3000"
-echo "Prometheus: http://$VM_CORE_IP:9091"
-```
-
-**Grafana Setup:**
-
-1. Login: admin/admin (change password)
-2. Add Prometheus data source: http://localhost:9091
-3. Import dashboards for 4G vs 5G comparison
-
-### Step 5: Test Both Networks
-
-**5G Test (vm-core):**
-
-```bash
-gcloud compute ssh vm-core --zone=us-central1-a
-
-# Start gNB
-cd /home/ubuntu/UERANSIM
-sudo ./build/nr-gnb -c config/open5gs-gnb.yaml &
-
-# Start UE (in same terminal)
-sudo ./build/nr-ue -c config/open5gs-ue.yaml &
-
-# Test internet connectivity
-sudo ping -I uesimtun0 -c 5 8.8.8.8
-```
-
-**4G Test (vm-4g-core):**
-
-```bash
-gcloud compute ssh vm-4g-core --zone=us-central1-a
-
-# Start eNB
-sudo /home/ubuntu/start-enb.sh &
-
-# Start UE
-sudo /home/ubuntu/start-ue.sh &
-
-# Test connectivity
-sudo ip netns exec ue1 ping -c 5 8.8.8.8
-```
-
-**Expected Results:**
-
-- **5G**: gNB connected, UE registered, ping 0% loss, latency ~10-20ms
-- **4G**: eNB connected, UE attached, ping 0% loss, latency ~30-50ms
+For detailed documentation, see:
+- **[PHASE-1-VM-Infrastructure.md](PHASE-1-VM-Infrastructure.md)** - Complete deployment guide
+- **[PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md)** - Testing and performance analysis
 
 ---
 
-## 📊 Unified Monitoring - 4G vs 5G Comparison
-
-**Access Dashboards:**
-
-- **Grafana**: http://<vm-core-public-ip>:3000 (admin/admin)
-- **Prometheus**: http://<vm-core-public-ip>:9091
-
-**Metrics Collected:**
-
-| Metric         | 5G (vm-core)   | 4G (vm-4g-core) | Prometheus Job              |
-| -------------- | -------------- | --------------- | --------------------------- |
-| Core Metrics   | Open5GS 5GC    | Open5GS EPC     | `open5gs-5g` / `open5gs-4g` |
-| System Metrics | Node Exporter  | Node Exporter   | `node-5g` / `node-4g`       |
-| Latency        | uesimtun0 ping | ue1 netns ping  | Manual test                 |
-| Throughput     | iperf3 test    | iperf3 test     | Manual test                 |
-
-**Grafana Queries for Comparison:**
-
-```promql
-# 5G UE Count
-sum(open5gs_amf_session{instance="vm-core"})
-
-# 4G UE Count
-sum(open5gs_mme_session{instance="vm-4g-core"})
-
-# CPU Usage Comparison
-100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
-
-# Network Traffic
-rate(node_network_receive_bytes_total[5m])
-```
-
----
-
-## 🚨 Quick Fix Reference
-
-cd ../ansible
-ansible-playbook -i inventory/hosts.ini playbooks/deploy-4g-core.yml -vv
-
-# Deploy srsRAN (4G RAN simulator)
-
-ansible-playbook -i inventory/hosts.ini playbooks/deploy-srsran.yml -vv
-
-````
-
-### Step 7: Test 4G Network
-
-```bash
-# SSH to vm-4g-core
-gcloud compute ssh vm-4g-core --zone=us-central1-a
-
-# Start eNB (in one terminal)
-sudo /home/ubuntu/start-enb.sh
-
-# Start UE (in another terminal)
-sudo /home/ubuntu/start-ue.sh
-
-# Test connectivity (in third terminal)
-sudo ip netns exec ue1 ping -c 5 8.8.8.8
-````
-
-**Expected Results:**
-
-- eNB: "S1 Setup Request successful"
-- UE: "RRC Connected"
-- Ping: 0% packet loss
-
----
-
-## 📊 4G vs 5G Performance Comparison
-
-| Metric     | 4G (LTE)          | 5G (NR)           | Notes                     |
-| ---------- | ----------------- | ----------------- | ------------------------- |
-| Latency    | 30-50ms           | 10-20ms           | Use `ping` through tunnel |
-| Throughput | 100-150 Mbps      | 200-400 Mbps      | Use `iperf3`              |
-| Setup Time | 2-3s              | 1-2s              | Time to attach            |
-| Core       | EPC (MME/SGW/PGW) | 5GC (AMF/SMF/UPF) | Different architecture    |
-| RAN        | srsRAN eNB        | UERANSIM gNB      | Different simulators      |
-
-**Benchmark Commands:**
-
-```bash
-# 5G Throughput Test
-iperf3 -s  # On external server
-sudo ip netns exec ue1 iperf3 -c <server-ip> -t 30  # On vm-core
-
-# 4G Throughput Test
-sudo ip netns exec ue1 iperf3 -c <server-ip> -t 30  # On vm-4g-core
-```
-
----
-
-## 🚨 Quick Fix Reference
-
-### WebUI Not Accessible
-
-**Problem:** WebUI binding to 127.0.0.1 instead of 0.0.0.0
-
-```bash
-# Fix WebUI binding to 0.0.0.0 instead of localhost
-sudo sed -i "s/'localhost'/'0.0.0.0'/" /usr/lib/node_modules/open5gs/server/index.js
-sudo systemctl restart open5gs-webui
-
-# Verify
-sudo ss -tlnp | grep 9999  # Should show: 0.0.0.0:9999 (not 127.0.0.1)
-```
-
-### Prometheus Port Conflict
-
-**Problem:** Prometheus fails with "bind: address already in use" on port 9090
-
-```bash
-# Change Prometheus from port 9090 to 9091 (Open5GS uses 9090 for metrics)
-echo 'ARGS="--web.listen-address=0.0.0.0:9091"' | sudo tee /etc/default/prometheus
-sudo systemctl daemon-reload
-sudo systemctl restart prometheus
-
-# Access: http://<IP>:9091
-```
-
-### All Open5GS Services Status
-
-```bash
-# Check all 8 core services at once
-for svc in nrfd amfd smfd upfd udmd udrd pcfd ausfd; do
-  echo -n "open5gs-$svc: "
-  systemctl is-active open5gs-$svc
-done
-```
-
----
-
-### Step 4: Deploy UERANSIM RAN Simulator
-
-```bash
-ansible-playbook -i inventory/hosts.ini playbooks/deploy-ueransim.yml
-```
-
-### Step 5: Test Connectivity
-
-```bash
-bash ../scripts/test-connectivity.sh
-```
-
----
-
-## 📂 Project Structure
-
-```
-devops-5g-project/
-├── terraform/                                # Infrastructure as Code
-│   ├── main.tf                              # VPC, subnets, firewall, VMs
-│   ├── variables.tf                         # Input variables
-│   └── outputs.tf                           # Deployment outputs
-├── ansible/                                 # Configuration Management
-│   ├── ansible.cfg                          # Ansible configuration
-│   ├── inventory/
-│   │   └── hosts.ini                        # Managed hosts
-│   └── playbooks/
-│       ├── deploy-core.yml                  # Open5GS deployment
-│       └── deploy-ueransim.yml              # UERANSIM deployment
-├── scripts/                                 # Test and utility scripts
-│   └── test-connectivity.sh                 # 5G connectivity verification
-├── PHASE-1-VM-Infrastructure-Deployment.md  # ⭐ Main deployment guide
-├── PHASE-2-Testing-Benchmarking.md          # Testing & benchmarking
-├── WORKING-CONFIG-REFERENCE.md              # Configuration reference
-├── CLEANUP-OLD-VMS.md                       # Resource cleanup
-└── README.md                                # This file
-```
-
----
-
-## 📚 Documentation
-
-| Document                                                                           | Purpose                                                                                                  |
-| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| [PHASE-1-VM-Infrastructure-Deployment.md](PHASE-1-VM-Infrastructure-Deployment.md) | **⭐ VM preparation, Terraform infrastructure provisioning, Ansible setup, Open5GS/UERANSIM deployment** |
-| [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md)                 | Testing, benchmarking, performance comparison, configuration reference, troubleshooting                  |
-| [CLEANUP-OLD-VMS.md](CLEANUP-OLD-VMS.md)                                           | Steps to clean up old GCP resources                                                                      |
-
----
-
-## 🎯 Key Features
-
-- **Infrastructure as Code:** Complete Terraform configuration for GCP
-- **SSH Authentication:** ED25519 keys with OS Login disabled
-- **Ansible Automation:** Playbooks for Open5GS and UERANSIM deployment
-- **DNS Resolution:** Fixed nameservers (8.8.8.8, 1.1.1.1) for reliable package installation
-- **Retry Logic:** 3-attempt retry on failed package installations
-- **Build Optimization:** Parallel compilation for UERANSIM (make -j$(nproc))
-- **Configuration Templates:** Pre-configured gNB and UE YAML files with PLMN 999/70
-
----
-
-## 🔧 Technology Stack
-
-| Component     | Version | Purpose                                      |
-| ------------- | ------- | -------------------------------------------- |
-| **Terraform** | 1.x     | Infrastructure provisioning                  |
-| **GCP**       | latest  | Cloud platform (e2-medium VMs, 4GB RAM each) |
-| **Ubuntu**    | 22.04   | Base OS for both VMs                         |
-| **Ansible**   | 2.10+   | Configuration management                     |
-| **Open5GS**   | Latest  | 5G core network components                   |
-| **UERANSIM**  | v3.2.6  | 5G RAN simulator (gNB + UE)                  |
-| **MongoDB**   | Latest  | Open5GS subscriber database                  |
-
----
-
-## 🌐 Network Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Google Cloud Platform                        │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │              VPC: open5gs-vpc (10.10.0.0/24)             │  │
-│  │                                                           │  │
-│  │  ┌─────────────────┐          ┌─────────────────────┐    │  │
-│  │  │   VM Core       │          │    VM RAN           │    │  │
-│  │  │   10.10.0.2     │◄────────►│   10.10.0.100       │    │  │
-│  │  │                 │  NGAP    │                     │    │  │
-│  │  │ • NRF (29510)   │ (38412)  │ • gNB (simulated)   │    │  │
-│  │  │ • AMF (38412)   │          │ • UE (simulated)    │    │  │
-│  │  │ • SMF (8805)    │          │                     │    │  │
-│  │  │ • UPF           │          │ PLMN: 999/70        │    │  │
-│  │  │ • MongoDB       │          │ IMSI: 999700000..   │    │  │
-│  │  │ • Prometheus    │          │                     │    │  │
-│  │  └─────────────────┘          └─────────────────────┘    │  │
-│  │                                                           │  │
-│  │              UE Subnet: 10.45.0.0/16 (TAP)              │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  Firewall Rules:                                                │
-│  • allow-5g-lab (all protocols within VPC)                      │
-│  • allow-ssh (TCP:22 from any IP)                               │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## ✅ Deployment Checklist
-
-- [ ] GCP project created and billing enabled
-- [ ] `gcloud`, `terraform`, `ansible` installed
-- [ ] Terraform infrastructure provisioned (6 resources)
-- [ ] SSH keys configured and tested
-- [ ] Open5GS deployed and services running
-- [ ] UERANSIM built and configured
-- [ ] Connectivity tests passing
-
----
-
-## 💾 Example Configuration Files
-
-### 5G Configuration (PLMN 999/70 - Test Network)
-
-```yaml
-# From WORKING-CONFIG-REFERENCE.md
-PLMN:
-  MCC: 999
-  MNC: 70
-  SST: 0 # Slice Service Type
-
-IMSI: 999700000000001
-
-Security:
-  K: 465B5CE8B199B49FAA5F0A2EE238A6BC
-  OPc: E8ED289DEBA952E4283B54E88E6183CA
-```
-
-### Terraform Infrastructure
-
-```hcl
-# From terraform/main.tf
-resource "google_compute_instance" "core" {
-  name         = "vm-core"
-  machine_type = "e2-medium"
-
-  network_interface {
-    network_ip = "10.10.0.2"
-    network    = google_compute_network.vpc.id
-  }
-}
-```
-
----
-
-## 🔗 External Resources
-
-- **Open5GS Documentation:** https://open5gs.org/
-- **UERANSIM GitHub:** https://github.com/aligungr/UERANSIM
-- **GCP Terraform Provider:** https://registry.terraform.io/providers/hashicorp/google/
-- **Ansible Playbook Guide:** https://docs.ansible.com/ansible/latest/user_guide/playbooks.html
-- **3GPP 5G Specifications:** https://www.3gpp.org/
-
----
-
-## 🆘 Support
-
-For **complete deployment instructions**, see [PHASE-1-VM-Infrastructure-Deployment.md](PHASE-1-VM-Infrastructure-Deployment.md).
-
-For **testing, benchmarking, configuration reference, and troubleshooting**, see [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md).
-
----
-
-**Last Updated:** December 16, 2025  
-**Status:** ✅ Production-Ready | All components deployed and tested
-│ ├── deploy-core.yml # Open5GS 5G core deployment
-│ └── deploy-ueransim.yml # UERANSIM RAN simulator compilation
-├── scripts/ # Testing & utilities
-│ └── test-connectivity.sh # Verify 5G UE attachment
-├── CLEANUP-OLD-VMS.md # Guide to cleanup old resources
-├── PHASE-1-Infrastructure-Config.md # Detailed setup guide
-├── PHASE-2-Testing-Benchmarking.md # Performance benchmarking
-
-├── WORKING-CONFIG-REFERENCE.md # All configuration details
-└── README.md # This file
-
-```
-
----
-
-## 📖 Documentation
-
-For detailed instructions, see:
-
-1. **[SSH-SETUP-GUIDE.md](SSH-SETUP-GUIDE.md)** - Complete SSH configuration for Ansible
-2. **[PHASE-1-Infrastructure-Config.md](PHASE-1-Infrastructure-Config.md)** - Infrastructure provisioning and core network setup
-3. **[PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md)** - Performance benchmarking and observability setup
-4. **[WORKING-CONFIG-REFERENCE.md](WORKING-CONFIG-REFERENCE.md)** - Complete configuration reference (PLMN, IMSI, keys, ports)
-5. **[CLEANUP-OLD-VMS.md](CLEANUP-OLD-VMS.md)** - Guide to cleanup old resources
-
----
-
-
-## 🏢 Executive Summary
-
-This project demonstrates a modern **DevOps approach to telecommunications** by treating the mobile network as code (**Network as Code**). Rather than manually clicking in the GCP console, you automate the deployment of a dual-core network (supporting both legacy 4G LTE and standalone 5G SA) using:
-
-- **Infrastructure as Code (Terraform)** - Provisions the cloud environment reproducibly
-- **Configuration Management (Ansible)** - Deploys application stack idempotently
-- **Comparative Benchmarking** - Analyzes performance (QoS) and resource efficiency
-- **Observability** - Grafana dashboards demonstrating cloud-native advantages
-
-The result is a scientific comparison proving why 5G is fundamentally suited for cloud deployment while 4G requires specialized hardware.
-
-**Key Objectives:**
-
-- ✅ Automate infrastructure provisioning with Terraform (Network as Code)
-- ✅ Deploy application stack with Ansible (Configuration as Code)
-- ✅ Dual-core network (4G EPC + 5G SA) running side-by-side
-- ✅ Comparative performance benchmarking (QoS metrics)
-- ✅ Prove 5G is cloud-efficient vs. 4G physical layer complexity
-- ✅ Observability stack (Prometheus + Grafana) with actionable dashboards
-- ✅ Production-ready, reproducible, and fully documented
-
----
-
-## 🏗️ Architectural Strategy
-
-### Two-Tier Separation of Duties
-
-```
-
-┌────────────────────────────────────────────────────────────────────┐
-│ Google Cloud Platform (us-central1-a) │
-├────────────────────────────────────────────────────────────────────┤
-│ │
-│ THE "BRAIN" (vm-core) THE "EDGE" (vm-ran) │
-│ ───────────────────────── ──────────────────── │
-│ e2-medium (2vCPU/4GB) e2-medium (2vCPU/4GB) │
-│ 10.10.0.2 10.10.0.100 │
-│ │
-│ Control Plane: RAN Simulators: │
-│ • NRF (Discovery) • srsRAN v22 (4G eNB+UE) │
-│ • AMF (Access Mgmt) • UERANSIM v3.2 (5G gNB+UE) │
-│ • SMF (Session Mgmt) • ZMQ mode (virtual antenna) │
-│ • UDM, UDR, PCF, AUSF │
-│ • UPF (User Plane) Simulates backhaul latency │
-│ │
-│ Database: Observability: │
-│ • MongoDB (subscribers) • Node Exporter (metrics) │
-│ • Observability: • Prometheus (scrape) │
-│ • Prometheus (metrics) • Grafana (visualization) │
-│ • Grafana (dashboards) │
-│ │
-└────────────────────────────────────────────────────────────────────┘
-
-Why Separate VMs?
-✓ Simulates real-world backhaul latency between RAN and Core
-✓ Allows independent scaling and resource allocation
-✓ Isolates Radio interference simulation from control logic
-
-```
-
----
-
-## 📁 Project Structure
-
-```
-
-devops-5g-project/
-├── README.md # Project overview (this file)
-├── PHASE-1-Infrastructure-Config.md # Complete infrastructure guide
-├── PHASE-2-Testing-Benchmarking.md # Benchmarking & observability
-├── WORKING-CONFIG-REFERENCE.md # All configuration templates
-├── DOCUMENTATION-INDEX.md # Navigation guide
-├── QUICK-START-CHEATSHEET.md # Quick reference
-├── MASTER-EXECUTION-ALIGNMENT.md # Compliance checklist
-├── IMPLEMENTATION-RESOURCES.md # Where to get Terraform/Ansible code
-├── .gitignore # Git ignore rules
-└── .git/ # Version control
-
-````
-
-**Pure Documentation Design** - All code is documented with links to official sources.
-
----
-
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 
 ```bash
-# You will need:
-gcloud auth login          # Google Cloud authentication
-gcloud config set project telecom5g-prod2
-````
+# Verify tools are installed
+gcloud --version
+terraform --version
+ansible --version
+```
 
-### Three-Step Deployment
-
-**Step 1: Infrastructure (5-6 hours)**
-
-Read and follow **[PHASE-1-Infrastructure-Config.md](PHASE-1-Infrastructure-Config.md)**
-
-- Provisions 2 e2-medium VMs on GCP
-- Installs Open5GS 5G Core Network
-- Deploys RAN simulators (srsRAN, UERANSIM)
-- All configuration documented step-by-step
-
-**Step 2: Testing & Benchmarking (2-3 hours)**
-
-Read and follow **[PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md)**
-
-- Runs 4G vs 5G performance comparison
-- Sets up Prometheus + Grafana observability
-- Generates final report data
-
-### Where to Get Implementation Code
-
-**⚠️ Important:** We removed the legacy code folders to avoid confusion with the new architecture. Instead:
-
-- **[IMPLEMENTATION-RESOURCES.md](IMPLEMENTATION-RESOURCES.md)** - Shows exactly where to get:
-  - **Terraform** code snippets (write your own or use registry)
-  - **Ansible** playbooks (examples provided)
-  - **Test scripts** (manual or automated)
-  - Links to official GitHub repos (Open5GS, UERANSIM, srsRAN)
-  - Copy-paste templates for configs
-
-**Quick Reference:** See [QUICK-START-CHEATSHEET.md](QUICK-START-CHEATSHEET.md) for commands
-
----
-
-## 📊 Expected Performance
-
-| Metric               | 4G        | 5G       | Improvement |
-| -------------------- | --------- | -------- | ----------- |
-| Registration Latency | 120-150ms | 40-60ms  | ↓ 60%       |
-| Session Setup Time   | 80-100ms  | 25-35ms  | ↓ 68%       |
-| User Plane Latency   | 15-20ms   | 5-8ms    | ↓ 60%       |
-| Max Throughput       | 150 Mbps  | 800 Mbps | ↑ 433%      |
-
----
-
-## 💰 Cost Estimate
-
-**For 40 hours of development:**
-
-- vm-core (e2-medium): $1.20
-- vm-ran (e2-medium): $1.20
-- Storage (100GB SSD): $6.80
-- **Total: ~$15-20** (within GCP free tier)
-
----
-
-## 📚 Technology Stack
-
-| Layer            | Technology            | Version |
-| ---------------- | --------------------- | ------- |
-| **Cloud**        | Google Cloud Platform | Latest  |
-| **IaC**          | Terraform             | >= 1.5  |
-| **Config Mgmt**  | Ansible               | >= 2.10 |
-| **Core Network** | Open5GS               | v2.7.6  |
-| **4G RAN**       | srsRAN                | Latest  |
-| **5G RAN**       | UERANSIM              | v3.2.6  |
-| **Database**     | MongoDB               | 8.0     |
-| **Monitoring**   | Prometheus + Grafana  | Latest  |
-
----
-
-## 🔧 Key Features
-
-✅ **Infrastructure as Code** - All infrastructure defined in Terraform  
-✅ **Idempotent Configuration** - Run Ansible playbooks repeatedly  
-✅ **Dual-Core Network** - 4G EPC and 5G SA running simultaneously  
-✅ **Performance Benchmarking** - Automated load testing  
-✅ **Real-Time Monitoring** - Prometheus metrics + Grafana dashboards  
-✅ **Network Slicing** - eMBB, URLLC slice support  
-✅ **Production-Ready** - Security, isolation, and best practices included
-
----
-
-## 🛠️ Common Commands
+### Step 1: Deploy Network (5 min)
 
 ```bash
-# Deploy infrastructure
-cd terraform
-terraform init
-terraform plan
-terraform apply
+cd terraform-network
+terraform init && terraform apply -auto-approve
+```
 
-# Configure systems
-cd ../ansible
-ansible-playbook -i inventory.ini playbook-core.yml
-ansible-playbook -i inventory.ini playbook-ran.yml
+### Step 2: Deploy VM1 (4G Core) (15 min)
 
-# SSH into VMs
-gcloud compute ssh vm-core --zone=us-central1-a
-gcloud compute ssh vm-ran --zone=us-central1-a --tunnel-through-iap
+```bash
+cd ../terraform-vm1-4g
+terraform init && terraform apply -auto-approve
+cd ../ansible-vm1-4g
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-4g-core.yml
+```
 
-# View logs
-journalctl -u open5gs-amfd -f
-journalctl -u open5gs-smfd -f
+### Step 3: Deploy VM2 (5G Core) (15 min)
+
+```bash
+cd ../terraform-vm2-5g
+terraform init && terraform apply -auto-approve
+cd ../ansible-vm2-5g
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-5g-core.yml
+```
+
+### Step 4: Deploy VM3 (Monitoring) (15 min)
+
+```bash
+cd ../terraform-vm3-monitoring
+terraform init && terraform apply -auto-approve
+cd ../ansible-vm3-monitoring
+ansible-playbook -i inventory/hosts.ini playbooks/deploy-monitoring.yml
 ```
 
 ---
 
-## 🎯 Next Steps
+##  VM Specifications
 
-1. **Start with Phase 1:** Read [PHASE-1-Infrastructure-Config.md](PHASE-1-Infrastructure-Config.md)
-   - Provision infrastructure
-   - Deploy Open5GS
-   - Configure subscribers
-2. **Then Phase 2:** Read [PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md)
-   - Run performance tests
-   - Set up monitoring
-   - Analyze results
+| VM | Purpose | IP | Services |
+|----|---------|-----|----------|
+| **VM1** | 4G Core + RAN | 10.10.0.10 | Open5GS EPC, srsRAN, MongoDB, WebUI |
+| **VM2** | 5G Core + RAN | 10.10.0.20 | Open5GS 5GC, UERANSIM, MongoDB, WebUI |
+| **VM3** | Monitoring | 10.10.0.30 | Prometheus, Grafana |
 
 ---
 
-## 📖 Documentation References
+##  Testing
 
-- **Open5GS:** https://open5gs.org/open5gs/docs/
-- **UERANSIM:** https://github.com/aligungr/UERANSIM
-- **Terraform:** https://www.terraform.io/docs
-- **Ansible:** https://docs.ansible.com/
+Each VM has a dedicated test script:
+
+```bash
+# Test VM1
+ssh ubuntu@<VM1-IP> "bash /home/ubuntu/test-vm1-4g.sh"
+
+# Test VM2
+ssh ubuntu@<VM2-IP> "bash /home/ubuntu/test-vm2-5g.sh"
+
+# Test VM3
+ssh ubuntu@<VM3-IP> "bash /home/ubuntu/test-vm3-monitoring.sh"
+```
 
 ---
 
-## 📝 Notes
+##  Monitoring
 
-- This project is optimized for GCP free tier
-- All documentation follows production best practices
-- Code is version-controlled and reproducible
-- Suitable for academic projects, DevOps portfolios, and learning
+Access Grafana: `http://<VM3-PUBLIC-IP>:3000` (admin/admin)  
+Access Prometheus: `http://<VM3-PUBLIC-IP>:9090`
 
 ---
 
-**Status:** Production-Ready | **Last Updated:** December 2025 | **Version:** 1.0
+##  Project Structure
+
+```
+devops-5g-project/
+ terraform-network/          # Shared VPC and firewall rules
+ terraform-vm1-4g/           # VM1 (4G Core) infrastructure
+ terraform-vm2-5g/           # VM2 (5G Core) infrastructure
+ terraform-vm3-monitoring/   # VM3 (Monitoring) infrastructure
+ ansible-vm1-4g/             # VM1 software deployment
+ ansible-vm2-5g/             # VM2 software deployment
+ ansible-vm3-monitoring/     # VM3 software deployment
+ scripts/                    # Test scripts for each VM
+ PHASE-1-VM-Infrastructure.md
+ PHASE-2-Testing-Benchmarking.md
+ README.md
+```
+
+---
+
+##  Troubleshooting
+
+**VM1 Issues**: Check `/var/log/open5gs/mme.log`  
+**VM2 Issues**: Check `/var/log/open5gs/amf.log`  
+**VM3 Issues**: Check `http://localhost:9090/targets`
+
+---
+
+##  Cleanup
+
+```bash
+cd terraform-vm3-monitoring && terraform destroy -auto-approve
+cd ../terraform-vm2-5g && terraform destroy -auto-approve
+cd ../terraform-vm1-4g && terraform destroy -auto-approve
+cd ../terraform-network && terraform destroy -auto-approve
+```

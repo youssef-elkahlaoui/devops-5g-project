@@ -1,0 +1,329 @@
+---
+- name: Deploy Monitoring Infrastructure on VM3 (Prometheus + Grafana)
+  hosts: vm3_monitoring
+  become: true
+  vars:
+    vm1_4g_ip: "10.10.0.10"
+    vm2_5g_ip: "10.10.0.20"
+    vm3_ip: "10.10.0.30"
+
+  tasks:
+    - name: Fix DNS resolution
+      shell: |
+        echo "nameserver 8.8.8.8" | tee /etc/resolv.conf > /dev/null
+        echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+
+    - name: Update system packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - wget
+          - gnupg
+          - apt-transport-https
+          - software-properties-common
+        state: present
+
+    # ================================
+    #         Install Prometheus
+    # ================================
+    - name: Install Prometheus
+      apt:
+        name: prometheus
+        state: present
+        update_cache: yes
+
+    - name: Create Prometheus data directory
+      file:
+        path: /var/lib/prometheus/data
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: "0755"
+
+    - name: Configure Prometheus to scrape both VM1 (4G) and VM2 (5G)
+      copy:
+        dest: /etc/prometheus/prometheus.yml
+        content: |
+          global:
+            scrape_interval: 15s
+            evaluation_interval: 15s
+            external_labels:
+              cluster: 'telecom-4g-5g-comparison'
+              environment: 'production'
+
+          scrape_configs:
+            # Prometheus self-monitoring
+            - job_name: 'prometheus'
+              static_configs:
+                - targets: ['localhost:9090']
+                  labels:
+                    instance: 'vm3-monitoring'
+                    type: 'monitoring'
+            
+            # Open5GS 4G Core metrics (VM1)
+            - job_name: 'open5gs-4g-core'
+              static_configs:
+                - targets: ['{{ vm1_4g_ip }}:9090']
+                  labels:
+                    instance: 'vm1-4g-core'
+                    network: '4g'
+                    core_type: 'epc'
+                    location: 'vm1'
+            
+            # Node exporter for VM1 system metrics
+            - job_name: 'node-vm1-4g'
+              static_configs:
+                - targets: ['{{ vm1_4g_ip }}:9100']
+                  labels:
+                    instance: 'vm1-4g-core'
+                    network: '4g'
+                    type: 'system'
+            
+            # Open5GS 5G Core metrics (VM2)
+            - job_name: 'open5gs-5g-core'
+              static_configs:
+                - targets: ['{{ vm2_5g_ip }}:9090']
+                  labels:
+                    instance: 'vm2-5g-core'
+                    network: '5g'
+                    core_type: '5gc'
+                    location: 'vm2'
+            
+            # Node exporter for VM2 system metrics
+            - job_name: 'node-vm2-5g'
+              static_configs:
+                - targets: ['{{ vm2_5g_ip }}:9100']
+                  labels:
+                    instance: 'vm2-5g-core'
+                    network: '5g'
+                    type: 'system'
+            
+            # Node exporter for VM3 (monitoring server)
+            - job_name: 'node-vm3-monitoring'
+              static_configs:
+                - targets: ['localhost:9100']
+                  labels:
+                    instance: 'vm3-monitoring'
+                    type: 'monitoring-system'
+        owner: prometheus
+        group: prometheus
+        mode: "0644"
+
+    - name: Configure Prometheus startup arguments
+      lineinfile:
+        path: /etc/default/prometheus
+        regexp: "^ARGS="
+        line: 'ARGS="--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/var/lib/prometheus/data --web.console.templates=/etc/prometheus/consoles --web.console.libraries=/etc/prometheus/console_libraries --web.listen-address=0.0.0.0:9090 --web.enable-lifecycle"'
+        create: yes
+
+    - name: Restart Prometheus
+      systemd:
+        name: prometheus
+        state: restarted
+        enabled: yes
+        daemon_reload: yes
+
+    # ================================
+    #         Install Grafana
+    # ================================
+    - name: Add Grafana GPG key
+      shell: |
+        wget -q -O - https://packages.grafana.com/gpg.key | gpg --dearmor | tee /usr/share/keyrings/grafana.gpg > /dev/null
+      args:
+        creates: /usr/share/keyrings/grafana.gpg
+
+    - name: Add Grafana repository
+      apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/grafana.gpg] https://packages.grafana.com/oss/deb stable main"
+        state: present
+        filename: grafana
+
+    - name: Install Grafana
+      apt:
+        name: grafana
+        state: present
+        update_cache: yes
+
+    - name: Configure Grafana to bind to all interfaces
+      lineinfile:
+        path: /etc/grafana/grafana.ini
+        regexp: "^;http_addr ="
+        line: "http_addr = 0.0.0.0"
+        backrefs: yes
+
+    - name: Enable and start Grafana
+      systemd:
+        name: grafana-server
+        state: started
+        enabled: yes
+
+    - name: Wait for Grafana to be ready
+      wait_for:
+        port: 3000
+        delay: 5
+        timeout: 30
+
+    # ================================
+    #         Install Node Exporter
+    # ================================
+    - name: Install Node Exporter
+      apt:
+        name: prometheus-node-exporter
+        state: present
+        update_cache: yes
+
+    - name: Enable and start Node Exporter
+      systemd:
+        name: prometheus-node-exporter
+        state: started
+        enabled: yes
+
+    # ================================
+    #         Create Grafana Data Source (Prometheus)
+    # ================================
+    - name: Wait for Grafana API to be ready
+      uri:
+        url: "http://localhost:3000/api/health"
+        method: GET
+        status_code: 200
+      register: result
+      until: result.status == 200
+      retries: 10
+      delay: 3
+
+    - name: Add Prometheus as Grafana data source
+      uri:
+        url: "http://localhost:3000/api/datasources"
+        method: POST
+        body_format: json
+        body:
+          name: "Prometheus"
+          type: "prometheus"
+          url: "http://localhost:9090"
+          access: "proxy"
+          isDefault: true
+        headers:
+          Content-Type: "application/json"
+        user: admin
+        password: admin
+        force_basic_auth: yes
+        status_code: [200, 201, 409]
+      ignore_errors: yes
+
+    # ================================
+    #         Create Grafana Dashboard Configuration
+    # ================================
+    - name: Create Grafana dashboards directory
+      file:
+        path: /etc/grafana/dashboards
+        state: directory
+        owner: grafana
+        group: grafana
+        mode: "0755"
+
+    - name: Create 4G vs 5G Comparison Dashboard
+      copy:
+        dest: /etc/grafana/dashboards/4g-5g-comparison.json
+        content: |
+          {
+            "dashboard": {
+              "title": "4G vs 5G Network Comparison",
+              "tags": ["telecom", "4g", "5g", "comparison"],
+              "timezone": "browser",
+              "panels": [
+                {
+                  "id": 1,
+                  "title": "CPU Usage Comparison",
+                  "type": "graph",
+                  "targets": [
+                    {
+                      "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\",network=\"4g\"}[5m])) * 100)",
+                      "legendFormat": "4G Core (VM1)"
+                    },
+                    {
+                      "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\",network=\"5g\"}[5m])) * 100)",
+                      "legendFormat": "5G Core (VM2)"
+                    }
+                  ]
+                },
+                {
+                  "id": 2,
+                  "title": "Memory Usage Comparison",
+                  "type": "graph",
+                  "targets": [
+                    {
+                      "expr": "node_memory_MemAvailable_bytes{network=\"4g\"} / node_memory_MemTotal_bytes{network=\"4g\"} * 100",
+                      "legendFormat": "4G Available Memory %"
+                    },
+                    {
+                      "expr": "node_memory_MemAvailable_bytes{network=\"5g\"} / node_memory_MemTotal_bytes{network=\"5g\"} * 100",
+                      "legendFormat": "5G Available Memory %"
+                    }
+                  ]
+                },
+                {
+                  "id": 3,
+                  "title": "Network Traffic (4G vs 5G)",
+                  "type": "graph",
+                  "targets": [
+                    {
+                      "expr": "rate(node_network_receive_bytes_total{network=\"4g\"}[5m])",
+                      "legendFormat": "4G RX"
+                    },
+                    {
+                      "expr": "rate(node_network_transmit_bytes_total{network=\"4g\"}[5m])",
+                      "legendFormat": "4G TX"
+                    },
+                    {
+                      "expr": "rate(node_network_receive_bytes_total{network=\"5g\"}[5m])",
+                      "legendFormat": "5G RX"
+                    },
+                    {
+                      "expr": "rate(node_network_transmit_bytes_total{network=\"5g\"}[5m])",
+                      "legendFormat": "5G TX"
+                    }
+                  ]
+                }
+              ]
+            },
+            "overwrite": true
+          }
+        owner: grafana
+        group: grafana
+        mode: "0644"
+
+    - name: Display deployment summary
+      debug:
+        msg: |
+          ==========================================
+          VM3 (Monitoring) Deployment Complete ✅
+          ==========================================
+
+          VM3 IP: {{ vm3_ip }}
+
+          Services Running:
+          - Prometheus (port 9090)
+          - Grafana (port 3000)
+          - Node Exporter (port 9100)
+
+          Scraping Targets:
+          - VM1 (4G Core): {{ vm1_4g_ip }}:9090 (Open5GS) + :9100 (Node)
+          - VM2 (5G Core): {{ vm2_5g_ip }}:9090 (Open5GS) + :9100 (Node)
+
+          Access URLs:
+          - Prometheus: http://<VM3-PUBLIC-IP>:9090
+          - Grafana: http://<VM3-PUBLIC-IP>:3000
+            Login: admin / admin
+
+          Next Steps:
+          1. Access Grafana and change default password
+          2. Verify Prometheus targets: http://<VM3-PUBLIC-IP>:9090/targets
+          3. Create custom dashboards for 4G vs 5G comparison
+          4. Run tests on VM1 and VM2 to generate metrics
+
+          ==========================================
