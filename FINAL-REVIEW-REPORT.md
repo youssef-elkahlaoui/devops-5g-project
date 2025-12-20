@@ -366,14 +366,14 @@ All components are **fully configured**, **tested**, and **documented**.
 
 ### Network Configuration Consistency
 
-| Parameter   | Expected        | Verified        | Status |
-| ----------- | --------------- | --------------- | ------ |
-| VPC Name    | open5gs-vpc     | open5gs-vpc     | ✅     |
-| Subnet Name | control-subnet  | control-subnet  | ✅     |
-| Subnet CIDR | 10.10.0.0/24    | 10.10.0.0/24    | ✅     |
-| Project ID  | telecom5g-prod2 | telecom5g-prod2 | ✅     |
-| Region      | us-central1     | us-central1     | ✅     |
-| Zone        | us-central1-a   | us-central1-a   | ✅     |
+| Parameter   | Expected          | Verified          | Status |
+| ----------- | ----------------- | ----------------- | ------ |
+| VPC Name    | open5gs-vpc       | open5gs-vpc       | ✅     |
+| Subnet Name | control-subnet    | control-subnet    | ✅     |
+| Subnet CIDR | 10.10.0.0/24      | 10.10.0.0/24      | ✅     |
+| Project ID  | telecom5g-prod2-1 | telecom5g-prod2-1 | ✅     |
+| Region      | us-central1       | us-central1       | ✅     |
+| Zone        | us-central1-a     | us-central1-a     | ✅     |
 
 **Result:** ✅ **100% CONSISTENT**
 
@@ -513,7 +513,7 @@ devops-5g-project/
 - ✅ Google Cloud SDK installed and configured
 - ✅ Terraform >= 1.5 installed
 - ✅ Ansible >= 2.15 installed
-- ✅ GCP project created (telecom5g-prod2)
+- ✅ GCP project created (telecom5g-prod2-1)
 - ✅ Billing account linked
 - ✅ Compute Engine API enabled
 
@@ -551,7 +551,7 @@ devops-5g-project/
 ### ⚠️ Important Notes for Deployment
 
 1. **Ansible Inventory:** Update `ansible_host` in each inventory file with the VM's **public IP** (currently set to private IPs as placeholders)
-2. **GCP Project:** Ensure project ID `telecom5g-prod2` exists or update in variables.tf
+2. **GCP Project:** Ensure project ID `telecom5g-prod2-1` exists or update in variables.tf
 3. **SSH Keys:** Ensure SSH keys are properly configured for Ansible connectivity
 4. **Terraform State:** Consider using remote state (GCS bucket) for production
 5. **Cost:** Estimated ~$20/month for 3 x e2-medium instances (24/7)

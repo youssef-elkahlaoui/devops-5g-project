@@ -1,14 +1,15 @@
 # DevOps 4G/5G Core Network Deployment on GCP
+
 ## 3-VM Architecture: Isolated 4G, 5G, and Centralized Monitoring
 
-**Project Status:**  Production-Ready |  60-90 minutes (full deployment) |  ~$20/month  
+**Project Status:** Production-Ready | 60-90 minutes (full deployment) | ~$20/month  
 **Cloud Provider:** Google Cloud Platform (GCP)  
 **Region:** us-central1-a  
-**Project ID:** telecom5g-prod2
+**Project ID:** telecom5g-prod2-1
 
 ---
 
-##  Project Overview
+## Project Overview
 
 This project deploys a complete 4G and 5G core network infrastructure on GCP with **3 dedicated VMs**, enabling side-by-side performance comparison and analysis.
 
@@ -16,30 +17,31 @@ This project deploys a complete 4G and 5G core network infrastructure on GCP wit
 
 ```
 
-                          GCP VPC: open5gs-vpc                         
-                         Subnet: 10.10.0.0/24                          
+                          GCP VPC: open5gs-vpc
+                         Subnet: 10.10.0.0/24
 
-  -      
-     VM1 (4G Core)        VM2 (5G Core)       VM3 (Monitoring)   
-     10.10.0.10           10.10.0.20           10.10.0.30        
-        
-   Open5GS EPC          Open5GS 5GC          Prometheus          
-   srsRAN eNB/UE        UERANSIM gNB/UE      Grafana             
-   MongoDB              MongoDB              Node Exporter       
-   WebUI:9999           WebUI:9999                               
-   Metrics:9090         Metrics:9090         Scrapes from:       
-   Node Exp:9100        Node Exp:9100         VM1 & VM2          
-        
+  -
+     VM1 (4G Core)        VM2 (5G Core)       VM3 (Monitoring)
+     10.10.0.10           10.10.0.20           10.10.0.30
+
+   Open5GS EPC          Open5GS 5GC          Prometheus
+   srsRAN eNB/UE        UERANSIM gNB/UE      Grafana
+   MongoDB              MongoDB              Node Exporter
+   WebUI:9999           WebUI:9999
+   Metrics:9090         Metrics:9090         Scrapes from:
+   Node Exp:9100        Node Exp:9100         VM1 & VM2
+
 
 ```
 
 For detailed documentation, see:
+
 - **[PHASE-1-VM-Infrastructure.md](PHASE-1-VM-Infrastructure.md)** - Complete deployment guide
 - **[PHASE-2-Testing-Benchmarking.md](PHASE-2-Testing-Benchmarking.md)** - Testing and performance analysis
 
 ---
 
-##  Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -86,17 +88,17 @@ ansible-playbook -i inventory/hosts.ini playbooks/deploy-monitoring.yml
 
 ---
 
-##  VM Specifications
+## VM Specifications
 
-| VM | Purpose | IP | Services |
-|----|---------|-----|----------|
-| **VM1** | 4G Core + RAN | 10.10.0.10 | Open5GS EPC, srsRAN, MongoDB, WebUI |
+| VM      | Purpose       | IP         | Services                              |
+| ------- | ------------- | ---------- | ------------------------------------- |
+| **VM1** | 4G Core + RAN | 10.10.0.10 | Open5GS EPC, srsRAN, MongoDB, WebUI   |
 | **VM2** | 5G Core + RAN | 10.10.0.20 | Open5GS 5GC, UERANSIM, MongoDB, WebUI |
-| **VM3** | Monitoring | 10.10.0.30 | Prometheus, Grafana |
+| **VM3** | Monitoring    | 10.10.0.30 | Prometheus, Grafana                   |
 
 ---
 
-##  Testing
+## Testing
 
 Each VM has a dedicated test script:
 
@@ -113,14 +115,14 @@ ssh ubuntu@<VM3-IP> "bash /home/ubuntu/test-vm3-monitoring.sh"
 
 ---
 
-##  Monitoring
+## Monitoring
 
 Access Grafana: `http://<VM3-PUBLIC-IP>:3000` (admin/admin)  
 Access Prometheus: `http://<VM3-PUBLIC-IP>:9090`
 
 ---
 
-##  Project Structure
+## Project Structure
 
 ```
 devops-5g-project/
@@ -139,7 +141,7 @@ devops-5g-project/
 
 ---
 
-##  Troubleshooting
+## Troubleshooting
 
 **VM1 Issues**: Check `/var/log/open5gs/mme.log`  
 **VM2 Issues**: Check `/var/log/open5gs/amf.log`  
@@ -147,7 +149,7 @@ devops-5g-project/
 
 ---
 
-##  Cleanup
+## Cleanup
 
 ```bash
 cd terraform-vm3-monitoring && terraform destroy -auto-approve
