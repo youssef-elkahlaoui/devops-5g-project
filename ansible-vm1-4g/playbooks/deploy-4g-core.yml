@@ -92,7 +92,8 @@
           - open5gs-mme
           - open5gs-sgwc
           - open5gs-sgwu
-          - open5gs-pgw
+          - open5gs-smf
+          - open5gs-upf
           - open5gs-hss
           - open5gs-pcrf
         state: present
