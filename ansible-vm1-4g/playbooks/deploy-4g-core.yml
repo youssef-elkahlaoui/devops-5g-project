@@ -395,7 +395,7 @@
 
           Next Steps:
           1. Verify services: systemctl status open5gs-*
-          2. Run test script: bash /home/ubuntu/test-vm1-4g.sh
+          2. Run test script: bash /home/ayoubgory_gmail_com/test-vm1-4g.sh
           3. Start eNB: sudo srsenb /etc/srsran/enb.conf
           4. Start UE: sudo srsue /etc/srsran/ue.conf
 

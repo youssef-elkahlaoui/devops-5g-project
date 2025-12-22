@@ -332,7 +332,7 @@
 
           Next Steps:
           1. Verify services: systemctl status open5gs-*
-          2. Run test script: bash /home/ubuntu/test-vm2-5g.sh
+          2. Run test script: bash /home/ayoubgory_gmail_com/test-vm2-5g.sh
           3. Start gNB: sudo /opt/UERANSIM/build/nr-gnb -c /etc/ueransim/gnb.yaml
           4. Start UE: sudo /opt/UERANSIM/build/nr-ue -c /etc/ueransim/ue.yaml
 

@@ -111,7 +111,7 @@ gcloud compute routers nats list --router=open5gs-router --region=us-central1
 ### 2.1 Deploy VM1 Infrastructure
 
 ```bash
-cd ..\terraform-vm1-4g
+cd ../terraform-vm1-4g
 
 # Initialize Terraform
 terraform init
@@ -123,22 +123,19 @@ terraform plan
 terraform apply -auto-approve
 
 # Get VM1 public IP
-terraform output vm1_public_ip
+export VM1_IP=$(terraform output -raw vm1_public_ip)
+echo "VM1 Public IP: $VM1_IP"
 ```
 
-### 2.2 Configure SSH Access
+### 2.2 Test VM1 Connectivity
 
 ```bash
-# Get VM1 IP
-export VM1_IP=$(terraform output -raw vm1_public_ip)
+# Test SSH connectivity
+ssh ayoubgory_gmail_com@$VM1_IP "echo 'VM1 SSH successful'"
 
-Write-Host "VM1 Public IP: $VM1_IP"
-
-export VM1_Name="vm1-4g-core"
-
-# Test SSH connection
-
-gcloud compute ssh [Name of your machine]@$VM1_Name --zone='us-central1-a'
+# Verify OS Login user
+ssh ayoubgory_gmail_com@$VM1_IP "whoami"
+# Expected: ayoubgory_gmail_com
 ```
 
 ### 2.3 Deploy 4G Software Stack
@@ -167,7 +164,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/deploy-4g-core.yml -vv
 
 ```bash
 # SSH to VM1
-ssh ubuntu@$VM1_IP
+ssh ayoubgory_gmail_com@$VM1_IP
 
 # Check MongoDB
 mongosh --eval "db.adminCommand('ping')"
@@ -181,7 +178,7 @@ sudo systemctl status open5gs-pgwd
 mongosh open5gs --eval "db.subscribers.find().pretty()"
 
 # Check srsRAN installation
-ls -la /home/ubuntu/srsRAN/build/srsenb/src/srsenb
+ls -la /home/ayoubgory_gmail_com/srsRAN/build/srsenb/src/srsenb
 
 # Check Node Exporter
 curl http://localhost:9100/metrics | head -n 20
@@ -190,7 +187,22 @@ curl http://localhost:9100/metrics | head -n 20
 exit
 ```
 
-**✅ Checkpoint:** VM1 (4G Core) deployed and verified
+### 2.5 Test VM1 User Connectivity
+
+```bash
+# Quick verification that 4G user is configured
+ssh ayoubgory_gmail_com@$VM1_IP "mongosh open5gs --eval \"db.subscribers.findOne({imsi: '001010000000001'})\" | grep -o '\"imsi\" : \"001010000000001\"'"
+
+# Expected: "imsi" : "001010000000001"
+
+# Note: Full connectivity testing requires starting srsRAN simulation (see Phase 2)
+# Example commands for Phase 2:
+# sudo ./start-enb.sh  # Start 4G base station
+# sudo ./start-ue.sh   # Start 4G user equipment
+# sudo ip netns exec ue1 ping -c 10 8.8.8.8  # Test connectivity
+```
+
+**✅ Checkpoint:** VM1 (4G Core) deployed, verified, and user configured
 
 ---
 
@@ -199,7 +211,7 @@ exit
 ### 3.1 Deploy VM2 Infrastructure
 
 ```bash
-cd ..\terraform-vm2-5g
+cd ../terraform-vm2-5g
 
 # Initialize Terraform
 terraform init
@@ -211,18 +223,19 @@ terraform plan
 terraform apply -auto-approve
 
 # Get VM2 public IP
-terraform output vm2_public_ip
+export VM2_IP=$(terraform output -raw vm2_public_ip)
+echo "VM2 Public IP: $VM2_IP"
 ```
 
-### 3.2 Configure SSH Access
+### 3.2 Test VM2 Connectivity
 
 ```bash
-# Get VM2 IP
-$VM2_IP = (terraform output -raw vm2_public_ip)
-Write-Host "VM2 Public IP: $VM2_IP"
+# Test SSH connectivity
+ssh ayoubgory_gmail_com@$VM2_IP "echo 'VM2 SSH successful'"
 
-# Test SSH connection
-ssh ubuntu@$VM2_IP "echo 'VM2 SSH successful'"
+# Verify OS Login user
+ssh ayoubgory_gmail_com@$VM2_IP "whoami"
+# Expected: ayoubgory_gmail_com
 ```
 
 ### 3.3 Deploy 5G Software Stack
@@ -251,7 +264,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/deploy-5g-core.yml -vv
 
 ```bash
 # SSH to VM2
-ssh ubuntu@$VM2_IP
+ssh ayoubgory_gmail_com@$VM2_IP
 
 # Check MongoDB
 mongosh --eval "db.adminCommand('ping')"
@@ -265,7 +278,7 @@ sudo systemctl status open5gs-smfd
 mongosh open5gs --eval "db.subscribers.find().pretty()"
 
 # Check UERANSIM installation
-ls -la /home/ubuntu/UERANSIM/build/nr-gnb
+ls -la /home/ayoubgory_gmail_com/UERANSIM/build/nr-gnb
 
 # Check Node Exporter
 curl http://localhost:9100/metrics | head -n 20
@@ -277,7 +290,22 @@ curl http://localhost:7777/nnrf-nfm/v1/nf-instances | jq .
 exit
 ```
 
-**✅ Checkpoint:** VM2 (5G Core) deployed and verified
+### 3.5 Test VM2 User Connectivity
+
+```bash
+# Quick verification that 5G user is configured
+ssh ayoubgory_gmail_com@$VM2_IP "mongosh open5gs --eval \"db.subscribers.findOne({imsi: '999700000000001'})\" | grep -o '\"imsi\" : \"999700000000001\"'"
+
+# Expected: "imsi" : "999700000000001"
+
+# Note: Full connectivity testing requires starting UERANSIM simulation (see Phase 2)
+# Example commands for Phase 2:
+# sudo ./build/nr-gnb -c config/open5gs-gnb.yaml  # Start 5G base station
+# sudo ./build/nr-ue -c config/open5gs-ue.yaml     # Start 5G user equipment
+# sudo ping -I uesimtun0 -c 10 8.8.8.8            # Test connectivity
+```
+
+**✅ Checkpoint:** VM2 (5G Core) deployed, verified, and user configured
 
 ---
 
@@ -309,7 +337,7 @@ $VM3_IP = (terraform output -raw vm3_public_ip)
 Write-Host "VM3 Public IP: $VM3_IP"
 
 # Test SSH connection
-ssh ubuntu@$VM3_IP "echo 'VM3 SSH successful'"
+ssh ayoubgory_gmail_com@$VM3_IP "echo 'VM3 SSH successful'"
 ```
 
 ### 4.3 Deploy Monitoring Stack
@@ -336,7 +364,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/deploy-monitoring.yml -vv
 
 ```bash
 # SSH to VM3
-ssh ubuntu@$VM3_IP
+ssh ayoubgory_gmail_com@$VM3_IP
 
 # Check Prometheus service
 sudo systemctl status prometheus
@@ -375,12 +403,12 @@ exit
 
 ```bash
 # Open Grafana in browser
-Write-Host "Grafana: http://$VM3_IP:3000"
-Write-Host "Username: admin"
-Write-Host "Password: admin"
+echo "Grafana: http://$VM3_IP:3000"
+echo "Username: admin"
+echo "Password: admin"
 
 # Open Prometheus in browser
-Write-Host "Prometheus: http://$VM3_IP:9090"
+echo "Prometheus: http://$VM3_IP:9090"
 ```
 
 **✅ Checkpoint:** VM3 (Monitoring) deployed and scraping both VMs
@@ -393,10 +421,10 @@ Write-Host "Prometheus: http://$VM3_IP:9090"
 
 ```bash
 # Copy test script to VM1
-scp scripts/test-vm1-4g.sh ubuntu@$VM1_IP:/home/ubuntu/
+scp scripts/test-vm1-4g.sh ayoubgory_gmail_com@$VM1_IP:/home/ayoubgory_gmail_com/
 
 # Run test script
-ssh ubuntu@$VM1_IP "bash /home/ubuntu/test-vm1-4g.sh"
+ssh ayoubgory_gmail_com@$VM1_IP "bash /home/ayoubgory_gmail_com/test-vm1-4g.sh"
 
 # Expected results:
 # ✅ MongoDB ping successful
@@ -425,10 +453,10 @@ ssh ubuntu@$VM1_IP "bash /home/ubuntu/test-vm1-4g.sh"
 
 ```bash
 # Copy test script to VM2
-scp scripts/test-vm2-5g.sh ubuntu@$VM2_IP:/home/ubuntu/
+scp scripts/test-vm2-5g.sh ayoubgory_gmail_com@$VM2_IP:/home/ayoubgory_gmail_com/
 
 # Run test script
-ssh ubuntu@$VM2_IP "bash /home/ubuntu/test-vm2-5g.sh"
+ssh ayoubgory_gmail_com@$VM2_IP "bash /home/ayoubgory_gmail_com/test-vm2-5g.sh"
 
 # Expected results:
 # ✅ MongoDB ping successful
@@ -460,10 +488,10 @@ ssh ubuntu@$VM2_IP "bash /home/ubuntu/test-vm2-5g.sh"
 
 ```bash
 # Copy test script to VM3
-scp scripts/test-vm3-monitoring.sh ubuntu@$VM3_IP:/home/ubuntu/
+scp scripts/test-vm3-monitoring.sh ayoubgory_gmail_com@$VM3_IP:/home/ayoubgory_gmail_com/
 
 # Run test script
-ssh ubuntu@$VM3_IP "bash /home/ubuntu/test-vm3-monitoring.sh"
+ssh ayoubgory_gmail_com@$VM3_IP "bash /home/ayoubgory_gmail_com/test-vm3-monitoring.sh"
 
 # Expected results:
 # ✅ Prometheus service running
@@ -549,7 +577,7 @@ http://$VM2_IP:9999
 
 ```bash
 # Check MME logs
-ssh ubuntu@$VM1_IP
+ssh ayoubgory_gmail_com@$VM1_IP
 sudo journalctl -u open5gs-mmed -n 50 -f
 
 # Check MongoDB connection
@@ -566,7 +594,7 @@ ip addr show ogstun
 
 ```bash
 # Check AMF logs
-ssh ubuntu@$VM2_IP
+ssh ayoubgory_gmail_com@$VM2_IP
 sudo journalctl -u open5gs-amfd -n 50 -f
 
 # Check NRF registration
@@ -583,7 +611,7 @@ ip addr show uesimtun0
 
 ```bash
 # Check Prometheus targets
-ssh ubuntu@$VM3_IP
+ssh ayoubgory_gmail_com@$VM3_IP
 curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, instance: .labels.instance, health: .health}'
 
 # Check Grafana logs
