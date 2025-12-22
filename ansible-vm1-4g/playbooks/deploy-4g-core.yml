@@ -1,267 +1,283 @@
----
-- name: Deploy Open5GS 4G EPC Network + srsRAN on VM1
+- name: Deploy Open5GS 4G EPC + srsRAN + WebUI (GCP)
   hosts: vm1_4g_core
   become: true
+
   vars:
     vm1_ip: "10.10.0.10"
-    vm3_monitoring_ip: "10.10.0.30"
+
+  handlers:
+    - name: Restart systemd-resolved
+      systemd:
+        name: systemd-resolved
+        state: restarted
 
   tasks:
-    - name: Fix DNS resolution
-      shell: |
-        echo "nameserver 8.8.8.8" | tee /etc/resolv.conf > /dev/null
-        echo "nameserver 1.1.1.1" >> /etc/resolv.conf
 
-    - name: Update and upgrade apt packages
-      apt:
-        update_cache: yes
-        upgrade: dist
-        cache_valid_time: 3600
+  # =================================================
+  # 0. APT SAFETY (PREVENT LOCKS)
+  # =================================================
+  - name: Disable apt background services
+    systemd:
+      name: "{{ item }}"
+      enabled: no
+      state: stopped
+    loop:
+      - apt-daily.service
+      - apt-daily.timer
+      - unattended-upgrades
 
-    - name: Install base dependencies
-      apt:
-        name:
-          - software-properties-common
-          - wget
-          - curl
-          - gnupg
-          - git
-          - net-tools
-          - iptables
-          - iputils-ping
-          - tcpdump
-          - vim
-          - build-essential
-          - cmake
-          - libfftw3-dev
-          - libmbedtls-dev
-          - libboost-program-options-dev
-          - libconfig++-dev
-          - libsctp-dev
-          - libuhd-dev
-          - libzmq3-dev
-        state: present
+  - name: Wait for apt lock
+    shell: |
+      while fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
+            fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+        sleep 5
+      done
 
-    # ================================
-    #         MongoDB 8.0 Setup
-    # ================================
-    - name: Download MongoDB GPG key
-      shell: |
-        curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
-        gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+  # =================================================
+  # 1. SYSTEM PREPARATION
+  # =================================================
+  - name: Create 4GB swap (OOM protection)
+    shell: |
+      if [ ! -f /swapfile ]; then
+        fallocate -l 4G /swapfile
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+      fi
+
+  - name: Load SCTP kernel module
+    modprobe:
+      name: sctp
+      state: present
+
+  - name: Configure DNS permanently
+    copy:
+      dest: /etc/systemd/resolved.conf
+      content: |
+        [Resolve]
+        DNS=8.8.8.8 1.1.1.1
+    notify: Restart systemd-resolved
+
+  # =================================================
+  # 2. BASE PACKAGES
+  # =================================================
+  - name: Install base system packages
+    apt:
+      update_cache: yes
+      name:
+        - git
+        - curl
+        - wget
+        - gnupg
+        - build-essential
+        - cmake
+        - net-tools
+        - iptables
+        - iputils-ping
+        - tcpdump
+        - libsctp-dev
+        - libzmq3-dev
+        - libfftw3-dev
+        - libmbedtls-dev
+        - libboost-program-options-dev
+        - libconfig++-dev
+
+  # =================================================
+  # 3. MONGODB 8.0 (IDEMPOTENT)
+  # =================================================
+  - name: Download MongoDB GPG key
+    get_url:
+      url: https://www.mongodb.org/static/pgp/server-8.0.asc
+      dest: /usr/share/keyrings/mongodb-server-8.0.asc
+      mode: "0644"
+
+  - name: Convert MongoDB GPG key
+    command: >
+      gpg --dearmor
+      -o /usr/share/keyrings/mongodb-server-8.0.gpg
+      /usr/share/keyrings/mongodb-server-8.0.asc
+    args:
+      creates: /usr/share/keyrings/mongodb-server-8.0.gpg
+
+  - name: Add MongoDB repository
+    apt_repository:
+      repo: >
+        deb [signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg]
+        https://repo.mongodb.org/apt/ubuntu
+        jammy/mongodb-org/8.0 multiverse
+      filename: mongodb-org-8.0
+      state: present
+
+  - name: Install MongoDB
+    apt:
+      update_cache: yes
+      name: mongodb-org
+
+  - name: Limit MongoDB RAM to 512MB
+    blockinfile:
+      path: /etc/mongod.conf
+      marker: "# {mark} ANSIBLE MONGO LIMIT"
+      block: |
+        storage:
+          wiredTiger:
+            engineConfig:
+              cacheSizeGB: 0.5
+
+  - name: Start MongoDB
+    systemd:
+      name: mongod
+      state: restarted
+      enabled: yes
+
+  # =================================================
+  # 4. OPEN5GS EPC
+  # =================================================
+  - name: Add Open5GS PPA
+    apt_repository:
+      repo: ppa:open5gs/latest
+      state: present
+
+  - name: Install Open5GS 4G EPC
+    apt:
+      update_cache: yes
+      name:
+        - open5gs-mme
+        - open5gs-sgwc
+        - open5gs-sgwu
+        - open5gs-hss
+        - open5gs-upf
+        - open5gs-pcrf
+
+  - name: Configure MME
+    copy:
+      dest: /etc/open5gs/mme.yaml
+      content: |
+        mme:
+          s1ap:
+            - addr: {{ vm1_ip }}
+          gtpc:
+            - addr: {{ vm1_ip }}
+          gummei:
+            plmn_id: { mcc: 001, mnc: 01 }
+            mme_gid: 2
+            mme_code: 1
+          tai:
+            plmn_id: { mcc: 001, mnc: 01 }
+            tac: 1
+          network_name: { full: Open5GS-4G }
+
+  - name: Configure UPF
+    copy:
+      dest: /etc/open5gs/upf.yaml
+      content: |
+        upf:
+          gtpu:
+            - addr: {{ vm1_ip }}
+          subnet:
+            - addr: 10.45.0.1/16
+
+  # =================================================
+  # 5. NETWORKING (NAT)
+  # =================================================
+  - name: Enable IP forwarding
+    sysctl:
+      name: net.ipv4.ip_forward
+      value: "1"
+      reload: yes
+
+  - name: Enable NAT for UE traffic
+    iptables:
+      table: nat
+      chain: POSTROUTING
+      source: 10.45.0.0/16
+      jump: MASQUERADE
+
+  # =================================================
+  # 6. SRSRAN (LOW MEMORY SAFE)
+  # =================================================
+  - name: Build srsRAN_4G
+    shell: |
+      git clone https://github.com/srsran/srsRAN_4G.git /opt/srsran || true
+      cd /opt/srsran
+      mkdir -p build && cd build
+      cmake ..
+      make -j1
+      make install
+      ldconfig
+    args:
+      creates: /usr/local/bin/srsenb
+
+  - name: Create srsRAN config directory
+    file:
+      path: /etc/srsran
+      state: directory
+      mode: "0755"
+
+  - name: Configure srsRAN eNB
+    copy:
+      dest: /etc/srsran/enb.conf
+      content: |
+        [rf]
+        device_name = zmq
+        device_args = tx_port=tcp://*:2000,rx_port=tcp://localhost:2001
+
+        [enb]
+        enb_id = 0x19B
+        mcc = 001
+        mnc = 01
+        mme_addr = {{ vm1_ip }}
+        gtp_bind_addr = {{ vm1_ip }}
+        s1c_bind_addr = {{ vm1_ip }}
+
+    # =================================================
+  # 7. OPEN5GS WEBUI (SAFE & NON-BLOCKING)
+  # =================================================
+
+  - name: Install NodeSource Setup Script (Node 18)
+      shell: curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
       args:
-        creates: /usr/share/keyrings/mongodb-server-8.0.gpg
+        creates: /etc/apt/sources.list.d/nodesource.list
 
-    - name: Add MongoDB repository for Ubuntu 22.04 (Jammy)
-      apt_repository:
-        repo: "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse"
-        state: present
-        filename: mongodb-org-8.0
+  - name: Install Node.js v18
+    apt:
+      name: nodejs
+      state: present
+      update_cache: yes
 
-    - name: Install MongoDB 8.0
-      apt:
-        name: mongodb-org
-        state: present
-        update_cache: yes
+  - name: Install Open5GS WebUI via Official Script
+    shell: curl -fsSL https://open5gs.org/open5gs/assets/webui/install | bash -
+    environment:
+      SUDO_USER: root
+    args:
+      creates: /usr/lib/node_modules/open5gs/server/index.js
 
-    - name: Enable and start MongoDB
-      systemd:
-        name: mongod
-        state: started
-        enabled: yes
+  - name: Fix WebUI Dependencies (Clean Install)
+    npm:
+      path: /usr/lib/node_modules/open5gs
+      state: present
 
-    # ================================
-    #         Open5GS EPC (4G) Installation
-    # ================================
-    - name: Add Open5GS PPA
-      apt_repository:
-        repo: ppa:open5gs/latest
-        state: present
+  - name: Configure WebUI to listen on all interfaces
+    replace:
+      path: /usr/lib/node_modules/open5gs/server/index.js
+      regexp: "const _hostname = process.env.HOSTNAME \\|\\| 'localhost';"
+      replace: "const _hostname = process.env.HOSTNAME || '0.0.0.0';"
+    notify: Restart Open5GS WebUI
 
-    - name: Install Node.js for WebUI
-      shell: |
-        curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
-        echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
-        apt-get update
-        apt-get install -y nodejs
-      ignore_errors: yes
-
-    - name: Install Open5GS 4G EPC packages
-      apt:
-        name:
-          - open5gs-mme
-          - open5gs-sgwc
-          - open5gs-sgwu
-          - open5gs-smf
-          - open5gs-upf
-          - open5gs-hss
-          - open5gs-pcrf
-        state: present
-        update_cache: yes
-
-    - name: Install Open5GS WebUI
-      shell: curl -fsSL https://open5gs.org/open5gs/assets/webui/install | bash -
-      environment:
-        SUDO_USER: root
-      ignore_errors: yes
-
-    - name: Configure WebUI to listen on all interfaces
-      shell: |
-        sed -i "s/const _hostname = process.env.HOSTNAME || 'localhost';/const _hostname = process.env.HOSTNAME || '0.0.0.0';/" /usr/lib/node_modules/open5gs/server/index.js
-      ignore_errors: yes
-
-    - name: Configure MME for 4G (MCC=001, MNC=01)
-      copy:
-        dest: /etc/open5gs/mme.yaml
-        content: |
-          logger:
-            file: /var/log/open5gs/mme.log
-
-          mme:
-            freeDiameter: /etc/freeDiameter/mme.conf
-            s1ap:
-              - addr: {{ vm1_ip }}
-            gtpc:
-              - addr: {{ vm1_ip }}
-            metrics:
-              - addr: 0.0.0.0
-                port: 9090
-            gummei:
-              plmn_id:
-                mcc: 001
-                mnc: 01
-              mme_gid: 2
-              mme_code: 1
-            tai:
-              plmn_id:
-                mcc: 001
-                mnc: 01
-              tac: 1
-            security:
-                integrity_order: [EIA2, EIA1, EIA0]
-                ciphering_order: [EEA0, EEA1, EEA2]
-            network_name:
-                full: Open5GS-4G
-
-    - name: Configure SGW-C
-      copy:
-        dest: /etc/open5gs/sgwc.yaml
-        content: |
-          logger:
-            file: /var/log/open5gs/sgwc.log
-
-          sgwc:
-            gtpc:
-              - addr: {{ vm1_ip }}
-            pfcp:
-              - addr: {{ vm1_ip }}
-
-    - name: Configure SGW-U
-      copy:
-        dest: /etc/open5gs/sgwu.yaml
-        content: |
-          logger:
-            file: /var/log/open5gs/sgwu.log
-
-          sgwu:
-            pfcp:
-              - addr: {{ vm1_ip }}
-            gtpu:
-              - addr: {{ vm1_ip }}
-
-    - name: Configure PGW (PDN Gateway)
-      copy:
-        dest: /etc/open5gs/pgw.yaml
-        content: |
-          logger:
-            file: /var/log/open5gs/pgw.log
-
-          pgw:
-            gtpc:
-              - addr: {{ vm1_ip }}
-            gtpu:
-              - addr: {{ vm1_ip }}
-            subnet:
-              - addr: 10.45.0.1/16
-            dns:
-              - 8.8.8.8
-              - 8.8.4.4
-            metrics:
-              - addr: 0.0.0.0
-                port: 9090
-
-    - name: Configure HSS (Home Subscriber Server)
-      copy:
-        dest: /etc/open5gs/hss.yaml
-        content: |
-          logger:
-            file: /var/log/open5gs/hss.log
-
-          hss:
-            freeDiameter: /etc/freeDiameter/hss.conf
-
-    - name: Configure PCRF
-      copy:
-        dest: /etc/open5gs/pcrf.yaml
-        content: |
-          logger:
-            file: /var/log/open5gs/pcrf.log
-
-          pcrf:
-            freeDiameter: /etc/freeDiameter/pcrf.conf
-
-    # ================================
-    #         Setup IP Tables for UE connectivity
-    # ================================
-    - name: Enable IP forwarding
-      sysctl:
-        name: net.ipv4.ip_forward
-        value: "1"
-        state: present
-        reload: yes
-
-    - name: Create iptables directory
-      file:
-        path: /etc/iptables
-        state: directory
-        mode: "0755"
-
-    - name: Configure iptables for 4G UE traffic (ogstun)
-      shell: |
-        iptables -t nat -A POSTROUTING -s 10.45.0.0/16 ! -o ogstun -j MASQUERADE
-        iptables-save > /etc/iptables/rules.v4
-      ignore_errors: yes
-
-    - name: Start Open5GS 4G EPC services
-      systemd:
-        name: open5gs-{{ item }}d
-        state: started
-        enabled: yes
-      loop:
-        - hss
-        - mme
-        - sgwc
-        - sgwu
-        - pgw
-        - pcrf
-
-    - name: Wait for services to be ready
-      wait_for:
-        timeout: 10
-
-    # ================================
-    #         Add Test Subscriber
-    # ================================
-    - name: Add 4G test subscriber to MongoDB
-      shell: |
-        mongosh open5gs --eval '
-        db.subscribers.insertOne({
-          imsi: "001010000000001",
-          msisdn: ["1234567890"],
-          security: {
-            k: "465B5CE8B199B49FAA5F0A2EE238A6BC",
-            opc: "E8ED289DEBA952E4283B54E88E6183CA",
-            amf: "8000"
+  # =================================================
+  # 9. ADD TEST SUBSCRIBER
+  # =================================================
+  - name: Insert test UE subscriber
+    shell: |
+      mongosh open5gs --eval '
+      db.subscribers.updateOne(
+        {imsi:"001010000000001"},
+        {$set:{
+          imsi:"001010000000001",
+          security:{
+            k:"465B5CE8B199B49FAA5F0A2EE238A6BC",
+            opc:"E8ED289DEBA952E4283B54E88E6183CA",
+            amf:"8000"
           },
           ambr: {
             downlink: {value: 1, unit: 3},
