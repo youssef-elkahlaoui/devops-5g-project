@@ -741,48 +741,7 @@ curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[].health'
 
 ## � Additional Implementation for Complete Project Requirements
 
-### 1️⃣ Node Exporter on All VMs
-
-Install Node Exporter on VM1, VM2, and VM3 for system metrics (CPU, RAM, network).
-
-```bash
-# On each VM (VM1, VM2, VM3)
-sudo apt update
-sudo apt install -y prometheus-node-exporter
-
-# Verify service
-sudo systemctl status prometheus-node-exporter
-```
-
-Update `prometheus.yml` on VM3:
-
-```yaml
-- job_name: "node-vm1-4g"
-  static_configs:
-    - targets: ["vm1-4g-core:9100"]
-      labels:
-        instance: "vm1-4g-core"
-
-- job_name: "node-vm2-5g"
-  static_configs:
-    - targets: ["vm2-5g-core:9100"]
-      labels:
-        instance: "vm2-5g-core"
-
-- job_name: "node-vm3-monitoring"
-  static_configs:
-    - targets: ["localhost:9100"]
-```
-
-Restart Prometheus:
-
-```bash
-sudo systemctl restart prometheus
-```
-
-**✅ Checkpoint:** All Node Exporter targets UP in Prometheus.
-
-### 2️⃣ QoS Collection Scripts
+### 1️⃣ QoS Collection Scripts
 
 Use the scripts in `tests/` folder for standardized measurements.
 
@@ -817,7 +776,7 @@ iperf3 -s -u
 ./run_iperf_udp.sh <target_ip> 60 100  # 100 Mbps bandwidth
 ```
 
-### 3️⃣ Enhanced Grafana Dashboards
+### 2️⃣ Enhanced Grafana Dashboards
 
 #### Dashboard 1: Infrastructure Monitoring
 
@@ -831,7 +790,7 @@ Add panels for average throughput, RTT, jitter, packet loss with labels `tech="4
 
 Panels for download times (wget), UDP stability, performance under load.
 
-### 4️⃣ API Gateway on VM3 (Security)
+### 3️⃣ API Gateway on VM3 (Security)
 
 Implement NGINX as API Gateway for 5G control plane security.
 
@@ -890,7 +849,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### 5️⃣ Security Validation
+### 4️⃣ Security Validation
 
 Test API Gateway security:
 
@@ -911,7 +870,7 @@ Check logs:
 sudo tail -f /var/log/nginx/api_gateway.log
 ```
 
-### 6️⃣ Speed Comparison Test (4G vs 5G)
+### 5️⃣ Speed Comparison Test (4G vs 5G)
 
 Run simultaneous throughput tests during active simulations.
 
@@ -933,7 +892,7 @@ Run simultaneous throughput tests during active simulations.
 
 **Expected Results:** 5G should show higher throughput and lower CPU usage.
 
-### 7️⃣ Correlation QoS ↔ Security
+### 6️⃣ Correlation QoS ↔ Security
 
 Demonstrate that API Gateway protects against overload:
 
