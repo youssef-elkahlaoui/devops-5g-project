@@ -798,6 +798,31 @@ Implement NGINX as API Gateway for 5G control plane security.
 
 ```bash
 sudo apt install -y nginx
+
+# Install nginx-prometheus-exporter for metrics
+wget https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v0.11.0/nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz
+tar -xzf nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz
+sudo mv nginx-prometheus-exporter /usr/local/bin/
+sudo useradd -r -s /bin/false nginx-exporter
+
+# Create systemd service
+sudo tee /etc/systemd/system/nginx-exporter.service > /dev/null <<EOF
+[Unit]
+Description=Nginx Prometheus Exporter
+After=network.target
+
+[Service]
+User=nginx-exporter
+ExecStart=/usr/local/bin/nginx-prometheus-exporter -nginx.scrape-uri=http://localhost/nginx_status
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable nginx-exporter
+sudo systemctl start nginx-exporter
 ```
 
 #### Configuration (/etc/nginx/sites-available/api-gateway)
@@ -806,6 +831,14 @@ sudo apt install -y nginx
 server {
     listen 80;
     server_name api-gateway;
+
+    # Stub status for metrics
+    location /nginx_status {
+        stub_status on;
+        access_log off;
+        allow 127.0.0.1;
+        deny all;
+    }
 
     # Auth
     auth_basic "5G Control Plane";
@@ -832,6 +865,22 @@ server {
     access_log /var/log/nginx/api_gateway.log;
     error_log /var/log/nginx/api_gateway_error.log;
 }
+```
+
+#### Update Prometheus Configuration
+
+Add nginx-exporter to `prometheus.yml` on VM3:
+
+```yaml
+- job_name: "nginx"
+  static_configs:
+    - targets: ["localhost:9113"]
+```
+
+Restart Prometheus:
+
+```bash
+sudo systemctl restart prometheus
 ```
 
 Create htpasswd file:

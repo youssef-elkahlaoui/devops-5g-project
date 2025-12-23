@@ -242,6 +242,55 @@
           "legendFormat": "5G Disk (VM2)"
         }
       ]
+    },
+    {
+      "title": "API Gateway Requests",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(nginx_http_requests_total{instance=\"vm3-monitoring\"}[1m])",
+          "legendFormat": "API Gateway Requests/sec"
+        }
+      ]
+    },
+    {
+      "title": "API Gateway Response Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "expr": "nginx_http_request_duration_seconds{quantile=\"0.5\",instance=\"vm3-monitoring\"}",
+          "legendFormat": "Median Response Time"
+        },
+        {
+          "expr": "nginx_http_request_duration_seconds{quantile=\"0.95\",instance=\"vm3-monitoring\"}",
+          "legendFormat": "95th Percentile"
+        }
+      ]
     }
   ],
   "schemaVersion": 30,
