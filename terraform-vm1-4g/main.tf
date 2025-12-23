@@ -59,7 +59,7 @@ resource "google_compute_firewall" "vm1_open5gs_fw" {
   network = var.vpc_network_name
 
   target_tags = ["core-4g"]
-  source_ranges = ["10.10.0.0/24"] # 🔒 restrict to VPC (better than 0.0.0.0/0)
+  source_ranges = ["10.10.0.0/24"] 
 
   allow {
     protocol = "tcp"
