@@ -739,7 +739,211 @@ curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[].health'
 
 ---
 
-## 📚 Additional Resources
+## � Additional Implementation for Complete Project Requirements
+
+### 1️⃣ Node Exporter on All VMs
+
+Install Node Exporter on VM1, VM2, and VM3 for system metrics (CPU, RAM, network).
+
+```bash
+# On each VM (VM1, VM2, VM3)
+sudo apt update
+sudo apt install -y prometheus-node-exporter
+
+# Verify service
+sudo systemctl status prometheus-node-exporter
+```
+
+Update `prometheus.yml` on VM3:
+
+```yaml
+- job_name: "node-vm1-4g"
+  static_configs:
+    - targets: ["vm1-4g-core:9100"]
+      labels:
+        instance: "vm1-4g-core"
+
+- job_name: "node-vm2-5g"
+  static_configs:
+    - targets: ["vm2-5g-core:9100"]
+      labels:
+        instance: "vm2-5g-core"
+
+- job_name: "node-vm3-monitoring"
+  static_configs:
+    - targets: ["localhost:9100"]
+```
+
+Restart Prometheus:
+
+```bash
+sudo systemctl restart prometheus
+```
+
+**✅ Checkpoint:** All Node Exporter targets UP in Prometheus.
+
+### 2️⃣ QoS Collection Scripts
+
+Use the scripts in `tests/` folder for standardized measurements.
+
+#### Run Ping Test (RTT)
+
+```bash
+# From VM1 to VM2 (during 4G test)
+cd /path/to/tests
+./run_ping.sh 10.10.0.20 60
+
+# From VM2 to VM1 (during 5G test)
+./run_ping.sh 10.10.0.10 60
+```
+
+#### Run TCP Throughput Test
+
+```bash
+# Start iperf server on target VM
+iperf3 -s
+
+# Run client from source VM
+./run_iperf_tcp.sh <target_ip> 60
+```
+
+#### Run UDP Jitter/Loss Test
+
+```bash
+# Start UDP server
+iperf3 -s -u
+
+# Run client
+./run_iperf_udp.sh <target_ip> 60 100  # 100 Mbps bandwidth
+```
+
+### 3️⃣ Enhanced Grafana Dashboards
+
+#### Dashboard 1: Infrastructure Monitoring
+
+Create panels for CPU, RAM, Network RX/TX, Packet Drops.
+
+#### Dashboard 2: QoS 4G vs 5G Comparison
+
+Add panels for average throughput, RTT, jitter, packet loss with labels `tech="4G"` and `tech="5G"`.
+
+#### Dashboard 3: QoE (User Experience)
+
+Panels for download times (wget), UDP stability, performance under load.
+
+### 4️⃣ API Gateway on VM3 (Security)
+
+Implement NGINX as API Gateway for 5G control plane security.
+
+#### Installation
+
+```bash
+sudo apt install -y nginx
+```
+
+#### Configuration (/etc/nginx/sites-available/api-gateway)
+
+```nginx
+server {
+    listen 80;
+    server_name api-gateway;
+
+    # Auth
+    auth_basic "5G Control Plane";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+    location /smf {
+        limit_req zone=api burst=5 nodelay;
+        proxy_pass http://smf:7777;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /amf {
+        limit_req zone=api burst=5 nodelay;
+        proxy_pass http://amf:7777;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Logging
+    access_log /var/log/nginx/api_gateway.log;
+    error_log /var/log/nginx/api_gateway_error.log;
+}
+```
+
+Create htpasswd file:
+
+```bash
+sudo apt install -y apache2-utils
+sudo htpasswd -c /etc/nginx/.htpasswd user
+```
+
+Enable site:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/api-gateway /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### 5️⃣ Security Validation
+
+Test API Gateway security:
+
+```bash
+# Unauthorized request (should fail)
+curl http://vm3-ip/smf
+
+# Authorized request (should succeed)
+curl -u user:password http://vm3-ip/smf
+
+# Rate limit test (rapid requests)
+for i in {1..15}; do curl -u user:password http://vm3-ip/smf; done
+```
+
+Check logs:
+
+```bash
+sudo tail -f /var/log/nginx/api_gateway.log
+```
+
+### 6️⃣ Speed Comparison Test (4G vs 5G)
+
+Run simultaneous throughput tests during active simulations.
+
+#### Test Procedure
+
+1. Start 4G simulation on VM1
+2. Run TCP throughput test from VM1 to external server
+3. Stop 4G, start 5G on VM2
+4. Run same TCP test from VM2
+5. Compare results in Grafana dashboard
+
+```bash
+# During 4G test
+./run_iperf_tcp.sh iperf.he.net 60
+
+# During 5G test
+./run_iperf_tcp.sh iperf.he.net 60
+```
+
+**Expected Results:** 5G should show higher throughput and lower CPU usage.
+
+### 7️⃣ Correlation QoS ↔ Security
+
+Demonstrate that API Gateway protects against overload:
+
+1. Generate high traffic to API Gateway
+2. Monitor rate limiting in logs
+3. Observe stable control plane metrics in Grafana despite load
+
+---
+
+## �📚 Additional Resources
 
 - **Open5GS Metrics**: All Open5GS services expose Prometheus metrics on port 9090
 - **Node Exporter**: System metrics available on port 9100
@@ -757,4 +961,3 @@ curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[].health'
 5. **Monitoring**: Centralized Prometheus + Grafana provides unified visibility
 
 **Next:** Use these insights for your DevOps presentation or report! 🚀
-
