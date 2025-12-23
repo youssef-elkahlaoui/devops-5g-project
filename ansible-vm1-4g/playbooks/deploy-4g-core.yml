@@ -1,286 +1,343 @@
-- name: Deploy Open5GS 4G EPC + srsRAN + WebUI (GCP)
+---
+- name: Deploy Open5GS 4G EPC + srsRAN + WebUI + Node Exporter (GCP)
   hosts: vm1_4g_core
   become: true
 
   vars:
     vm1_ip: "10.10.0.10"
+    ue_subnet: "10.45.0.0/16"
 
+  # =================================================
+  # TASKS
+  # =================================================
+  tasks:
+
+    # =================================================
+    # 0. SYSTEM SAFETY
+    # =================================================
+    - name: Disable apt background services
+      systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      loop:
+        - apt-daily.service
+        - apt-daily.timer
+        - unattended-upgrades
+
+    - name: Create 4GB swap
+      shell: |
+        if [ ! -f /swapfile ]; then
+          fallocate -l 4G /swapfile
+          chmod 600 /swapfile
+          mkswap /swapfile
+          swapon /swapfile
+          echo '/swapfile none swap sw 0 0' >> /etc/fstab
+        fi
+      args:
+        creates: /swapfile
+
+    - name: Enable SCTP
+      modprobe:
+        name: sctp
+        state: present
+
+    - name: Configure DNS
+      copy:
+        dest: /etc/systemd/resolved.conf
+        content: |
+          [Resolve]
+          DNS=8.8.8.8 1.1.1.1
+      notify: Restart systemd-resolved
+
+    # =================================================
+    # 1. BASE PACKAGES & BUILD DEPS
+    # =================================================
+    - name: Install base packages
+      apt:
+        update_cache: yes
+        name:
+          - git
+          - curl
+          - wget
+          - build-essential
+          - cmake
+          - net-tools
+          - iptables
+          - iputils-ping
+          - tcpdump
+          - libsctp-dev
+          - libzmq3-dev
+          - libfftw3-dev
+          - libmbedtls-dev
+          - libboost-program-options-dev
+          - libboost-system-dev
+          - libboost-test-dev
+          - libconfig++-dev
+
+    # =================================================
+    # 2. MONGODB 8.0
+    # =================================================
+    - name: Install MongoDB dependencies
+      apt:
+        name:
+          - gnupg
+          - ca-certificates
+        state: present
+
+    - name: Download MongoDB GPG key
+      get_url:
+        url: https://www.mongodb.org/static/pgp/server-8.0.asc
+        dest: /usr/share/keyrings/mongodb-server-8.0.asc
+        mode: "0644"
+
+    - name: Convert MongoDB GPG key
+      command: >
+        gpg --dearmor --yes
+        -o /usr/share/keyrings/mongodb-server-8.0.gpg
+        /usr/share/keyrings/mongodb-server-8.0.asc
+      args:
+        creates: /usr/share/keyrings/mongodb-server-8.0.gpg
+
+    - name: Add MongoDB repository
+      apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse"
+        filename: mongodb-org-8.0
+
+    - name: Install MongoDB
+      apt:
+        name: mongodb-org
+        state: present
+        update_cache: yes
+
+    - name: Limit MongoDB memory usage
+      blockinfile:
+        path: /etc/mongod.conf
+        marker: "# {mark} ANSIBLE MONGO LIMIT"
+        block: |
+          storage:
+            wiredTiger:
+              engineConfig:
+                cacheSizeGB: 0.5
+
+    - name: Start MongoDB
+      systemd:
+        name: mongod
+        state: started
+        enabled: yes
+
+    # =================================================
+    # 3. OPEN5GS EPC
+    # =================================================
+    - name: Add Open5GS repository
+      apt_repository:
+        repo: ppa:open5gs/latest
+
+    - name: Install Open5GS EPC
+      apt:
+        update_cache: yes
+        name:
+          - open5gs-mme
+          - open5gs-sgwc
+          - open5gs-sgwu
+          - open5gs-hss
+          - open5gs-upf
+          - open5gs-pcrf
+
+    - name: Configure MME
+      copy:
+        dest: /etc/open5gs/mme.yaml
+        content: |
+          mme:
+            s1ap:
+              - addr: {{ vm1_ip }}
+            gtpc:
+              - addr: {{ vm1_ip }}
+            gummei:
+              plmn_id: { mcc: 001, mnc: 01 }
+              mme_gid: 2
+              mme_code: 1
+            tai:
+              plmn_id: { mcc: 001, mnc: 01 }
+              tac: 1
+            network_name: { full: Open5GS-4G }
+            metrics:
+              server:
+                - address: 0.0.0.0
+                  port: 9090
+      notify: Restart Open5GS
+
+    - name: Configure UPF
+      copy:
+        dest: /etc/open5gs/upf.yaml
+        content: |
+          upf:
+            gtpu:
+              - addr: {{ vm1_ip }}
+            subnet:
+              - addr: 10.45.0.1/16
+            metrics:
+              server:
+                - address: 0.0.0.0
+                  port: 9092
+      notify: Restart Open5GS
+
+    # =================================================
+    # 4. NETWORKING (NAT)
+    # =================================================
+    - name: Enable IP forwarding
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        reload: yes
+
+    - name: Enable NAT for UE traffic
+      iptables:
+        table: nat
+        chain: POSTROUTING
+        source: "{{ ue_subnet }}"
+        jump: MASQUERADE
+
+    # =================================================
+    # 5. SRSRAN (ZMQ MODE)
+    # =================================================
+    - name: Clone srsRAN_4G
+      git:
+        repo: https://github.com/srsran/srsRAN_4G.git
+        dest: /opt/srsran
+
+    - name: Build and install srsRAN
+      shell: |
+        mkdir -p build && cd build
+        cmake ..
+        make -j$(nproc)
+        make install
+        ldconfig
+      args:
+        chdir: /opt/srsran
+        creates: /usr/local/bin/srsenb
+    - name: Create srsRAN config directory
+      file:
+        path: /etc/srsran
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Configure srsRAN eNB
+      copy:
+        dest: /etc/srsran/enb.conf
+        content: |
+          [rf]
+          device_name = zmq
+          device_args = tx_port=tcp://*:2000,rx_port=tcp://localhost:2001
+
+          [enb]
+          enb_id = 0x19B
+          mcc = 001
+          mnc = 01
+          mme_addr = {{ vm1_ip }}
+          gtp_bind_addr = {{ vm1_ip }}
+          s1c_bind_addr = {{ vm1_ip }}
+
+    # =================================================
+    # 6. OPEN5GS WEBUI
+    # =================================================
+    - name: Install Node.js
+      shell: curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+      args:
+        creates: /etc/apt/sources.list.d/nodesource.list
+
+    - name: Install Node.js runtime
+      apt:
+        name: nodejs
+        state: present
+
+    - name: Install Open5GS WebUI
+      shell: curl -fsSL https://open5gs.org/open5gs/assets/webui/install | bash -
+      args:
+        creates: /usr/lib/node_modules/open5gs/server/index.js
+
+    - name: Bind WebUI to all interfaces
+      replace:
+        path: /usr/lib/node_modules/open5gs/server/index.js
+        regexp: "localhost"
+        replace: "0.0.0.0"
+      notify: Restart Open5GS WebUI
+
+    # =================================================
+    # 7. NODE EXPORTER
+    # =================================================
+    - name: Install Node Exporter
+      apt:
+        name: prometheus-node-exporter
+        state: present
+        update_cache: yes
+
+    - name: Expose Node Exporter on 0.0.0.0
+      lineinfile:
+        path: /etc/default/prometheus-node-exporter
+        regexp: '^ARGS='
+        line: 'ARGS="--web.listen-address=0.0.0.0:9100"'
+        create: yes
+      notify: Restart Node Exporter
+
+    # =================================================
+    # 8. ADD TEST SUBSCRIBER
+    # =================================================
+    - name: Wait for MongoDB
+      wait_for:
+        port: 27017
+        timeout: 30
+
+    - name: Insert test UE subscriber
+      shell: |
+        mongosh open5gs --eval '
+        db.subscribers.updateOne(
+          {imsi:"001010000000001"},
+          {$set:{
+            imsi:"001010000000001",
+            security:{
+              k:"465B5CE8B199B49FAA5F0A2EE238A6BC",
+              opc:"E8ED289DEBA952E4283B54E88E6183CA",
+              amf:"8000"
+            },
+            slice:[{sst:1,default_indicator:true,
+            session:[{name:"internet",type:3}]}]
+          }},
+          {upsert:true}
+        )'
+      args:
+        executable: /bin/bash
+
+  # =================================================
+  # HANDLERS
+  # =================================================
   handlers:
+
     - name: Restart systemd-resolved
       systemd:
         name: systemd-resolved
         state: restarted
 
-  tasks:
+    - name: Restart Open5GS
+      systemd:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - open5gs-mmed
+        - open5gs-sgwcd
+        - open5gs-sgwud
+        - open5gs-hssd
+        - open5gs-upfd
+        - open5gs-pcrfd
 
-  # =================================================
-  # 0. APT SAFETY (PREVENT LOCKS)
-  # =================================================
-  - name: Disable apt background services
-    systemd:
-      name: "{{ item }}"
-      enabled: no
-      state: stopped
-    loop:
-      - apt-daily.service
-      - apt-daily.timer
-      - unattended-upgrades
+    - name: Restart Open5GS WebUI
+      systemd:
+        name: open5gs-webui
+        state: restarted
 
-  - name: Wait for apt lock
-    shell: |
-      while fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
-            fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
-        sleep 5
-      done
-
-  # =================================================
-  # 1. SYSTEM PREPARATION
-  # =================================================
-  - name: Create 4GB swap (OOM protection)
-    shell: |
-      if [ ! -f /swapfile ]; then
-        fallocate -l 4G /swapfile
-        chmod 600 /swapfile
-        mkswap /swapfile
-        swapon /swapfile
-        echo '/swapfile none swap sw 0 0' >> /etc/fstab
-      fi
-
-  - name: Load SCTP kernel module
-    modprobe:
-      name: sctp
-      state: present
-
-  - name: Configure DNS permanently
-    copy:
-      dest: /etc/systemd/resolved.conf
-      content: |
-        [Resolve]
-        DNS=8.8.8.8 1.1.1.1
-    notify: Restart systemd-resolved
-
-  # =================================================
-  # 2. BASE PACKAGES
-  # =================================================
-  - name: Install base system packages
-    apt:
-      update_cache: yes
-      name:
-        - git
-        - curl
-        - wget
-        - gnupg
-        - build-essential
-        - cmake
-        - net-tools
-        - iptables
-        - iputils-ping
-        - tcpdump
-        - libsctp-dev
-        - libzmq3-dev
-        - libfftw3-dev
-        - libmbedtls-dev
-        - libboost-program-options-dev
-        - libconfig++-dev
-
-  # =================================================
-  # 3. MONGODB 8.0 (IDEMPOTENT)
-  # =================================================
-  - name: Download MongoDB GPG key
-    get_url:
-      url: https://www.mongodb.org/static/pgp/server-8.0.asc
-      dest: /usr/share/keyrings/mongodb-server-8.0.asc
-      mode: "0644"
-
-  - name: Convert MongoDB GPG key
-    command: >
-      gpg --dearmor
-      -o /usr/share/keyrings/mongodb-server-8.0.gpg
-      /usr/share/keyrings/mongodb-server-8.0.asc
-    args:
-      creates: /usr/share/keyrings/mongodb-server-8.0.gpg
-
-  - name: Add MongoDB repository
-    apt_repository:
-      repo: >
-        deb [signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg]
-        https://repo.mongodb.org/apt/ubuntu
-        jammy/mongodb-org/8.0 multiverse
-      filename: mongodb-org-8.0
-      state: present
-
-  - name: Install MongoDB
-    apt:
-      update_cache: yes
-      name: mongodb-org
-
-  - name: Limit MongoDB RAM to 512MB
-    blockinfile:
-      path: /etc/mongod.conf
-      marker: "# {mark} ANSIBLE MONGO LIMIT"
-      block: |
-        storage:
-          wiredTiger:
-            engineConfig:
-              cacheSizeGB: 0.5
-
-  - name: Start MongoDB
-    systemd:
-      name: mongod
-      state: restarted
-      enabled: yes
-
-  # =================================================
-  # 4. OPEN5GS EPC
-  # =================================================
-  - name: Add Open5GS PPA
-    apt_repository:
-      repo: ppa:open5gs/latest
-      state: present
-
-  - name: Install Open5GS 4G EPC
-    apt:
-      update_cache: yes
-      name:
-        - open5gs-mme
-        - open5gs-sgwc
-        - open5gs-sgwu
-        - open5gs-hss
-        - open5gs-upf
-        - open5gs-pcrf
-
-  - name: Configure MME
-    copy:
-      dest: /etc/open5gs/mme.yaml
-      content: |
-        mme:
-          s1ap:
-            - addr: {{ vm1_ip }}
-          gtpc:
-            - addr: {{ vm1_ip }}
-          gummei:
-            plmn_id: { mcc: 001, mnc: 01 }
-            mme_gid: 2
-            mme_code: 1
-          tai:
-            plmn_id: { mcc: 001, mnc: 01 }
-            tac: 1
-          network_name: { full: Open5GS-4G }
-
-  - name: Configure UPF
-    copy:
-      dest: /etc/open5gs/upf.yaml
-      content: |
-        upf:
-          gtpu:
-            - addr: {{ vm1_ip }}
-          subnet:
-            - addr: 10.45.0.1/16
-
-  # =================================================
-  # 5. NETWORKING (NAT)
-  # =================================================
-  - name: Enable IP forwarding
-    sysctl:
-      name: net.ipv4.ip_forward
-      value: "1"
-      reload: yes
-
-  - name: Enable NAT for UE traffic
-    iptables:
-      table: nat
-      chain: POSTROUTING
-      source: 10.45.0.0/16
-      jump: MASQUERADE
-
-  # =================================================
-  # 6. SRSRAN (LOW MEMORY SAFE)
-  # =================================================
-  - name: Build srsRAN_4G
-    shell: |
-      git clone https://github.com/srsran/srsRAN_4G.git /opt/srsran || true
-      cd /opt/srsran
-      mkdir -p build && cd build
-      cmake ..
-      make -j1
-      make install
-      ldconfig
-    args:
-      creates: /usr/local/bin/srsenb
-
-  - name: Create srsRAN config directory
-    file:
-      path: /etc/srsran
-      state: directory
-      mode: "0755"
-
-  - name: Configure srsRAN eNB
-    copy:
-      dest: /etc/srsran/enb.conf
-      content: |
-        [rf]
-        device_name = zmq
-        device_args = tx_port=tcp://*:2000,rx_port=tcp://localhost:2001
-
-        [enb]
-        enb_id = 0x19B
-        mcc = 001
-        mnc = 01
-        mme_addr = {{ vm1_ip }}
-        gtp_bind_addr = {{ vm1_ip }}
-        s1c_bind_addr = {{ vm1_ip }}
-
-    # =================================================
-  # 7. OPEN5GS WEBUI (SAFE & NON-BLOCKING)
-  # =================================================
-
-  - name: Install NodeSource Setup Script (Node 18)
-      shell: curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-      args:
-        creates: /etc/apt/sources.list.d/nodesource.list
-
-  - name: Install Node.js v18
-    apt:
-      name: nodejs
-      state: present
-      update_cache: yes
-
-  - name: Install Open5GS WebUI via Official Script
-    shell: curl -fsSL https://open5gs.org/open5gs/assets/webui/install | bash -
-    environment:
-      SUDO_USER: root
-    args:
-      creates: /usr/lib/node_modules/open5gs/server/index.js
-
-  - name: Fix WebUI Dependencies (Clean Install)
-    npm:
-      path: /usr/lib/node_modules/open5gs
-      state: present
-
-  - name: Configure WebUI to listen on all interfaces
-    replace:
-      path: /usr/lib/node_modules/open5gs/server/index.js
-      regexp: "const _hostname = process.env.HOSTNAME \\|\\| 'localhost';"
-      replace: "const _hostname = process.env.HOSTNAME || '0.0.0.0';"
-    notify: Restart Open5GS WebUI
-
-  # =================================================
-  # 9. ADD TEST SUBSCRIBER
-  # =================================================
-  - name: Insert test UE subscriber
-    shell: |
-      mongosh open5gs --eval '
-      db.subscribers.updateOne(
-        {imsi:"001010000000001"},
-        {$set:{
-          imsi:"001010000000001",
-          security:{
-            k:"465B5CE8B199B49FAA5F0A2EE238A6BC",
-            opc:"E8ED289DEBA952E4283B54E88E6183CA",
-            amf:"8000"
-          },
-          slice:[{sst:1,default_indicator:true,
-          session:[{name:"internet",type:3}]}]
-        }},
-        {upsert:true}
-      )'
+    - name: Restart Node Exporter
+      systemd:
+        name: prometheus-node-exporter
+        state: restarted

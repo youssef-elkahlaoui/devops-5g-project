@@ -59,26 +59,25 @@ resource "google_compute_firewall" "vm1_open5gs_fw" {
   network = var.vpc_network_name
 
   target_tags = ["core-4g"]
-  source_ranges = ["0.0.0.0/0"]
+  source_ranges = ["10.10.0.0/24"] # 🔒 restrict to VPC (better than 0.0.0.0/0)
 
   allow {
     protocol = "tcp"
-    ports    = ["22", "3000", "9090", "9999"]
+    ports    = ["22", "3000", "9090", "9092", "9999", "9100"]
   }
 
   allow {
     protocol = "udp"
     ports    = [
-      "2123",   # GTP-C
-      "2152",   # GTP-U
-      "8805",   # PFCP
-      "36412"   # S1AP (UDP fallback)
+      "2123",
+      "2152",
+      "8805",
+      "36412"
     ]
   }
 
   allow {
     protocol = "sctp"
-    ports    = ["36412"] # S1AP (MME)
+    ports    = ["36412"]
   }
 }
-
