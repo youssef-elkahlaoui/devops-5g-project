@@ -220,82 +220,50 @@
     # ================================
     - name: Create Grafana dashboards directory
       file:
-        path: /etc/grafana/dashboards
+        path: /var/lib/grafana/dashboards
         state: directory
         owner: grafana
         group: grafana
         mode: "0755"
 
-    - name: Create 4G vs 5G Comparison Dashboard
+    - name: Create Grafana provisioning directory
+      file:
+        path: /etc/grafana/provisioning/dashboards
+        state: directory
+        owner: grafana
+        group: grafana
+        mode: "0755"
+
+    - name: Configure Grafana dashboard provider
       copy:
-        dest: /etc/grafana/dashboards/4g-5g-comparison.json
+        dest: /etc/grafana/provisioning/dashboards/dashboard-provider.yml
         content: |
-          {
-            "dashboard": {
-              "title": "4G vs 5G Network Comparison",
-              "tags": ["telecom", "4g", "5g", "comparison"],
-              "timezone": "browser",
-              "panels": [
-                {
-                  "id": 1,
-                  "title": "CPU Usage Comparison",
-                  "type": "graph",
-                  "targets": [
-                    {
-                      "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\",network=\"4g\"}[5m])) * 100)",
-                      "legendFormat": "4G Core (VM1)"
-                    },
-                    {
-                      "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\",network=\"5g\"}[5m])) * 100)",
-                      "legendFormat": "5G Core (VM2)"
-                    }
-                  ]
-                },
-                {
-                  "id": 2,
-                  "title": "Memory Usage Comparison",
-                  "type": "graph",
-                  "targets": [
-                    {
-                      "expr": "node_memory_MemAvailable_bytes{network=\"4g\"} / node_memory_MemTotal_bytes{network=\"4g\"} * 100",
-                      "legendFormat": "4G Available Memory %"
-                    },
-                    {
-                      "expr": "node_memory_MemAvailable_bytes{network=\"5g\"} / node_memory_MemTotal_bytes{network=\"5g\"} * 100",
-                      "legendFormat": "5G Available Memory %"
-                    }
-                  ]
-                },
-                {
-                  "id": 3,
-                  "title": "Network Traffic (4G vs 5G)",
-                  "type": "graph",
-                  "targets": [
-                    {
-                      "expr": "rate(node_network_receive_bytes_total{network=\"4g\"}[5m])",
-                      "legendFormat": "4G RX"
-                    },
-                    {
-                      "expr": "rate(node_network_transmit_bytes_total{network=\"4g\"}[5m])",
-                      "legendFormat": "4G TX"
-                    },
-                    {
-                      "expr": "rate(node_network_receive_bytes_total{network=\"5g\"}[5m])",
-                      "legendFormat": "5G RX"
-                    },
-                    {
-                      "expr": "rate(node_network_transmit_bytes_total{network=\"5g\"}[5m])",
-                      "legendFormat": "5G TX"
-                    }
-                  ]
-                }
-              ]
-            },
-            "overwrite": true
-          }
+          apiVersion: 1
+          providers:
+            - name: 'Default'
+              orgId: 1
+              folder: ''
+              type: file
+              disableDeletion: false
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards
         owner: grafana
         group: grafana
         mode: "0644"
+
+    - name: Copy 4G vs 5G Comparison Dashboard
+      copy:
+        src: ../dashboards/4g-vs-5g.json
+        dest: /var/lib/grafana/dashboards/4g-vs-5g.json
+        owner: grafana
+        group: grafana
+        mode: "0644"
+
+    - name: Restart Grafana to apply provisioning
+      systemd:
+        name: grafana-server
+        state: restarted
 
     - name: Display deployment summary
       debug:

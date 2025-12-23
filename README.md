@@ -104,13 +104,13 @@ Each VM has a dedicated test script:
 
 ```bash
 # Test VM1
-ssh ubuntu@<VM1-IP> "bash /home/ubuntu/test-vm1-4g.sh"
+ssh ayoubgory_gmail_com@<VM1-IP> "bash /home/ayoubgory_gmail_com/test-vm1-4g.sh"
 
 # Test VM2
-ssh ubuntu@<VM2-IP> "bash /home/ubuntu/test-vm2-5g.sh"
+ssh ayoubgory_gmail_com@<VM2-IP> "bash /home/ayoubgory_gmail_com/test-vm2-5g.sh"
 
 # Test VM3
-ssh ubuntu@<VM3-IP> "bash /home/ubuntu/test-vm3-monitoring.sh"
+ssh ayoubgory_gmail_com@<VM3-IP> "bash /home/ayoubgory_gmail_com/test-vm3-monitoring.sh"
 ```
 
 ---

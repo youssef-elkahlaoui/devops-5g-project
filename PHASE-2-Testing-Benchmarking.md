@@ -48,9 +48,9 @@ $VM1_IP = (cd terraform-vm1-4g; terraform output -raw vm1_public_ip)
 $VM2_IP = (cd terraform-vm2-5g; terraform output -raw vm2_public_ip)
 $VM3_IP = (cd terraform-vm3-monitoring; terraform output -raw vm3_public_ip)
 
-ssh ubuntu@$VM1_IP "echo 'VM1 accessible'"
-ssh ubuntu@$VM2_IP "echo 'VM2 accessible'"
-ssh ubuntu@$VM3_IP "echo 'VM3 accessible'"
+ssh ayoubgory_gmail_com@$VM1_IP "echo 'VM1 accessible'"
+ssh ayoubgory_gmail_com@$VM2_IP "echo 'VM2 accessible'"
+ssh ayoubgory_gmail_com@$VM3_IP "echo 'VM3 accessible'"
 
 # Access Grafana
 Write-Host "Grafana: http://$VM3_IP:3000 (admin/admin)"
@@ -84,7 +84,7 @@ Start-Process "http://$VM3_IP:3000"
 
 ```bash
 # SSH to VM3
-ssh ubuntu@$VM3_IP
+ssh ayoubgory_gmail_com@$VM3_IP
 
 # Check all targets are UP
 curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, instance: .labels.instance, health: .health}'
@@ -102,18 +102,15 @@ exit
 
 ### 1.4 Import 4G vs 5G Dashboard
 
-In Grafana:
+The dashboard is automatically provisioned by Ansible. You should see it under **Dashboards → Browse**.
+
+If you need to import it manually:
 
 1. Navigate to **Dashboards → Import**
-2. Dashboard JSON should already exist at `/var/lib/grafana/dashboards/4g-vs-5g.json`
-3. Or create new dashboard with these panels:
-   - **CPU Usage**: `rate(node_cpu_seconds_total{mode="user"}[1m]) * 100`
-   - **Memory Usage**: `(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100`
-   - **Network Throughput**: `rate(node_network_receive_bytes_total[1m])`
-   - **Open5GS Sessions**: `open5gs_session_count`
-   - **Latency**: Custom metric from ping tests
+2. Upload the file from your local machine: `ansible-vm3-monitoring/dashboards/4g-vs-5g.json`
+3. Or copy-paste the JSON content from that file.
 
-**✅ Checkpoint:** Grafana configured with all 6 targets UP
+**✅ Checkpoint:** Grafana configured with all 6 targets UP and dashboard visible.
 
 ---
 
@@ -123,7 +120,7 @@ In Grafana:
 
 ```bash
 # SSH to VM1
-ssh ubuntu@$VM1_IP
+ssh ayoubgory_gmail_com@$VM1_IP
 
 # Verify Open5GS EPC is running
 sudo systemctl status open5gs-mmed
@@ -140,7 +137,7 @@ mongosh open5gs --eval "db.subscribers.findOne({imsi: '001010000000001'})"
 
 ```bash
 # In VM1 terminal 1
-cd /home/ubuntu
+cd /home/ayoubgory_gmail_com
 sudo ./start-enb.sh
 
 # Expected output:
@@ -158,9 +155,9 @@ sudo ./start-enb.sh
 
 ```bash
 # In VM1 terminal 2 (new SSH session)
-ssh ubuntu@$VM1_IP
+ssh ayoubgory_gmail_com@$VM1_IP
 
-cd /home/ubuntu
+cd /home/ayoubgory_gmail_com
 sudo ./start-ue.sh
 
 # Expected output:
@@ -183,7 +180,7 @@ sudo ip netns exec ue1 ip addr show
 
 ```bash
 # In VM1 terminal 3 (new SSH session)
-ssh ubuntu@$VM1_IP
+ssh ayoubgory_gmail_com@$VM1_IP
 
 # Ping Google DNS via 4G UE
 sudo ip netns exec ue1 ping -c 10 8.8.8.8
@@ -251,7 +248,7 @@ ps aux | grep -E "srsenb|srsue"
 
 ```bash
 # SSH to VM2
-ssh ubuntu@$VM2_IP
+ssh ayoubgory_gmail_com@$VM2_IP
 
 # Verify Open5GS 5GC is running
 sudo systemctl status open5gs-nrfd
@@ -268,7 +265,7 @@ mongosh open5gs --eval "db.subscribers.findOne({imsi: '999700000000001'})"
 
 ```bash
 # In VM2 terminal 1
-cd /home/ubuntu/UERANSIM
+cd /home/ayoubgory_gmail_com/UERANSIM
 sudo ./build/nr-gnb -c config/open5gs-gnb.yaml
 
 # Expected output:
@@ -285,9 +282,9 @@ sudo ./build/nr-gnb -c config/open5gs-gnb.yaml
 
 ```bash
 # In VM2 terminal 2 (new SSH session)
-ssh ubuntu@$VM2_IP
+ssh ayoubgory_gmail_com@$VM2_IP
 
-cd /home/ubuntu/UERANSIM
+cd /home/ayoubgory_gmail_com/UERANSIM
 sudo ./build/nr-ue -c config/open5gs-ue.yaml
 
 # Expected output:
@@ -305,7 +302,7 @@ ip addr show uesimtun0
 
 ```bash
 # In VM2 terminal 3 (new SSH session)
-ssh ubuntu@$VM2_IP
+ssh ayoubgory_gmail_com@$VM2_IP
 
 # Ping Google DNS via 5G UE
 sudo ping -I uesimtun0 -c 10 8.8.8.8
@@ -409,37 +406,90 @@ ps aux | grep -E "nr-gnb|nr-ue"
 
 ### 4.3 Create Grafana Comparison Dashboard
 
-**In Grafana, create a new dashboard with these panels:**
+**The dashboard is automatically provisioned, but here are the professional panel configurations used:**
 
-#### Panel 1: CPU Usage Comparison
+#### Panel 1: Real-time CPU Load (Gauge)
 
-```promql
-Query A (4G): rate(node_cpu_seconds_total{instance="10.10.0.10:9100",mode="user"}[1m]) * 100
-Query B (5G): rate(node_cpu_seconds_total{instance="10.10.0.20:9100",mode="user"}[1m]) * 100
-```
-
-#### Panel 2: Memory Usage Comparison
+_Visualizes the heavy radio math in 4G vs the lightweight 5G core._
 
 ```promql
-Query A (4G): (1 - (node_memory_MemAvailable_bytes{instance="10.10.0.10:9100"} / node_memory_MemTotal_bytes{instance="10.10.0.10:9100"})) * 100
-Query B (5G): (1 - (node_memory_MemAvailable_bytes{instance="10.10.0.20:9100"} / node_memory_MemTotal_bytes{instance="10.10.0.20:9100"})) * 100
+Query A (4G): 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",instance="vm1-4g-core"}[1m])) * 100)
+Query B (5G): 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",instance="vm2-5g-core"}[1m])) * 100)
 ```
 
-#### Panel 3: Network Throughput Comparison
+#### Panel 2: Network Throughput (Time Series)
+
+_Smooth lines showing Mbps comparison._
 
 ```promql
-Query A (4G): rate(node_network_receive_bytes_total{instance="10.10.0.10:9100",device!~"lo|docker.*"}[1m])
-Query B (5G): rate(node_network_receive_bytes_total{instance="10.10.0.20:9100",device!~"lo|docker.*"}[1m])
+Query A (4G): sum by (instance) (rate(node_network_receive_bytes_total{instance="vm1-4g-core",device!~"lo|docker.*"}[1m]) * 8 / 1000000)
+Query B (5G): sum by (instance) (rate(node_network_receive_bytes_total{instance="vm2-5g-core",device!~"lo|docker.*"}[1m]) * 8 / 1000000)
 ```
 
-#### Panel 4: Active Sessions
+#### Panel 3: Memory Utilization (Bar Gauge)
+
+_LCD-style bars for memory consumption._
 
 ```promql
-Query A (4G): open5gs_session_count{instance="10.10.0.10:9090"}
-Query B (5G): open5gs_session_count{instance="10.10.0.20:9090"}
+Query A (4G): (1 - (node_memory_MemAvailable_bytes{instance="vm1-4g-core"} / node_memory_MemTotal_bytes{instance="vm1-4g-core"})) * 100
+Query B (5G): (1 - (node_memory_MemAvailable_bytes{instance="vm2-5g-core"} / node_memory_MemTotal_bytes{instance="vm2-5g-core"})) * 100
 ```
 
-**✅ Checkpoint:** Comparison dashboard created in Grafana
+#### Panel 4: Active User Sessions (Stat)
+
+_Big numbers with background area graphs._
+
+```promql
+Query A (4G): sum by (instance) (open5gs_session_count{instance="vm1-4g-core"})
+Query B (5G): sum by (instance) (open5gs_session_count{instance="vm2-5g-core"})
+```
+
+#### Panel 5: Signaling Health (Status History)
+
+_Timeline of SCTP associations (S1AP for 4G, NGAP for 5G)._
+
+```promql
+Query A (4G): sum by (instance) (open5gs_sctp_stat_active_associations{instance="vm1-4g-core"})
+Query B (5G): sum by (instance) (open5gs_sctp_stat_active_associations{instance="vm2-5g-core"})
+```
+
+#### Panel 6: Network Reliability (Stat)
+
+_Error/Drop counter - turns RED if errors > 0._
+
+```promql
+Query A (4G): sum by (instance) (rate(node_network_receive_errs_total{instance="vm1-4g-core"}[1m]) + rate(node_network_receive_drop_total{instance="vm1-4g-core"}[1m]))
+Query B (5G): sum by (instance) (rate(node_network_receive_errs_total{instance="vm2-5g-core"}[1m]) + rate(node_network_receive_drop_total{instance="vm2-5g-core"}[1m]))
+```
+
+#### Panel 7: System Load (Gauge)
+
+_Classic needle gauge for OS load._
+
+```promql
+Query A (4G): node_load1{instance="vm1-4g-core"}
+Query B (5G): node_load1{instance="vm2-5g-core"}
+```
+
+#### Panel 8: Context Switches (Stat)
+
+_Measures kernel overhead during high traffic._
+
+```promql
+Query A (4G): rate(node_context_switches_total{instance="vm1-4g-core"}[1m])
+Query B (5G): rate(node_context_switches_total{instance="vm2-5g-core"}[1m])
+```
+
+#### Panel 9: Disk Activity (Bar Gauge)
+
+_Vertical gradient bars for write throughput._
+
+```promql
+Query A (4G): rate(node_disk_written_bytes_total{instance="vm1-4g-core"}[1m]) / 1024
+Query B (5G): rate(node_disk_written_bytes_total{instance="vm2-5g-core"}[1m]) / 1024
+```
+
+**✅ Checkpoint:** Comparison dashboard created in Grafana with professional visual styles.
 
 ---
 
@@ -449,7 +499,7 @@ Query B (5G): open5gs_session_count{instance="10.10.0.20:9090"}
 
 ```bash
 # SSH to VM1
-ssh ubuntu@$VM1_IP
+ssh ayoubgory_gmail_com@$VM1_IP
 
 # Start eNB and UE (as before)
 sudo ./start-enb.sh &
@@ -472,10 +522,10 @@ cat /tmp/4g-throughput.txt | grep "sender"
 
 ```bash
 # SSH to VM2
-ssh ubuntu@$VM2_IP
+ssh ayoubgory_gmail_com@$VM2_IP
 
 # Start gNB and UE (as before)
-cd /home/ubuntu/UERANSIM
+cd /home/ayoubgory_gmail_com/UERANSIM
 sudo ./build/nr-gnb -c config/open5gs-gnb.yaml &
 sleep 15
 sudo ./build/nr-ue -c config/open5gs-ue.yaml &
@@ -587,9 +637,9 @@ See attached: 4g-vs-5g-comparison.json
 
 ```bash
 # Run all verification tests one more time
-ssh ubuntu@$VM1_IP "bash /home/ubuntu/test-vm1-4g.sh"
-ssh ubuntu@$VM2_IP "bash /home/ubuntu/test-vm2-5g.sh"
-ssh ubuntu@$VM3_IP "bash /home/ubuntu/test-vm3-monitoring.sh"
+ssh ayoubgory_gmail_com@$VM1_IP "bash /home/ayoubgory_gmail_com/test-vm1-4g.sh"
+ssh ayoubgory_gmail_com@$VM2_IP "bash /home/ayoubgory_gmail_com/test-vm2-5g.sh"
+ssh ayoubgory_gmail_com@$VM3_IP "bash /home/ayoubgory_gmail_com/test-vm3-monitoring.sh"
 
 # Expected: All tests PASS
 ```
@@ -707,3 +757,4 @@ curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[].health'
 5. **Monitoring**: Centralized Prometheus + Grafana provides unified visibility
 
 **Next:** Use these insights for your DevOps presentation or report! 🚀
+

@@ -1,0 +1,262 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Real-time CPU Load",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 60 },
+              { "color": "red", "value": 85 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\",instance=\"vm1-4g-core\"}[1m])) * 100)",
+          "legendFormat": "4G Core (VM1)"
+        },
+        {
+          "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\",instance=\"vm2-5g-core\"}[1m])) * 100)",
+          "legendFormat": "5G Core (VM2)"
+        }
+      ]
+    },
+    {
+      "title": "Network Throughput (Mbps)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "gradientMode": "opacity"
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance) (rate(node_network_receive_bytes_total{instance=\"vm1-4g-core\",device!~\"lo|docker.*\"}[1m]) * 8 / 1000000)",
+          "legendFormat": "4G RX (VM1)"
+        },
+        {
+          "expr": "sum by (instance) (rate(node_network_receive_bytes_total{instance=\"vm2-5g-core\",device!~\"lo|docker.*\"}[1m]) * 8 / 1000000)",
+          "legendFormat": "5G RX (VM2)"
+        }
+      ]
+    },
+    {
+      "title": "Memory Utilization",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "purple", "value": 70 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "displayMode": "lcd",
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "expr": "(1 - (node_memory_MemAvailable_bytes{instance=\"vm1-4g-core\"} / node_memory_MemTotal_bytes{instance=\"vm1-4g-core\"})) * 100",
+          "legendFormat": "4G Memory (VM1)"
+        },
+        {
+          "expr": "(1 - (node_memory_MemAvailable_bytes{instance=\"vm2-5g-core\"} / node_memory_MemTotal_bytes{instance=\"vm2-5g-core\"})) * 100",
+          "legendFormat": "5G Memory (VM2)"
+        }
+      ]
+    },
+    {
+      "title": "Active User Sessions",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance) (open5gs_session_count{instance=\"vm1-4g-core\"})",
+          "legendFormat": "4G Sessions"
+        },
+        {
+          "expr": "sum by (instance) (open5gs_session_count{instance=\"vm2-5g-core\"})",
+          "legendFormat": "5G Sessions"
+        }
+      ]
+    },
+    {
+      "title": "Signaling Health (SCTP)",
+      "type": "status-history",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum by (instance) (open5gs_sctp_stat_active_associations{instance=\"vm1-4g-core\"})",
+          "legendFormat": "4G S1AP (VM1)"
+        },
+        {
+          "expr": "sum by (instance) (open5gs_sctp_stat_active_associations{instance=\"vm2-5g-core\"})",
+          "legendFormat": "5G NGAP (VM2)"
+        }
+      ]
+    },
+    {
+      "title": "Network Reliability",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.1 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (instance) (rate(node_network_receive_errs_total{instance=\"vm1-4g-core\"}[1m]) + rate(node_network_receive_drop_total{instance=\"vm1-4g-core\"}[1m]))",
+          "legendFormat": "4G Errors (VM1)"
+        },
+        {
+          "expr": "sum by (instance) (rate(node_network_receive_errs_total{instance=\"vm2-5g-core\"}[1m]) + rate(node_network_receive_drop_total{instance=\"vm2-5g-core\"}[1m]))",
+          "legendFormat": "5G Errors (VM2)"
+        }
+      ]
+    },
+    {
+      "title": "System Load (1m)",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 5,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "node_load1{instance=\"vm1-4g-core\"}",
+          "legendFormat": "4G Load (VM1)"
+        },
+        {
+          "expr": "node_load1{instance=\"vm2-5g-core\"}",
+          "legendFormat": "5G Load (VM2)"
+        }
+      ]
+    },
+    {
+      "title": "Context Switches",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 24 },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "expr": "rate(node_context_switches_total{instance=\"vm1-4g-core\"}[1m])",
+          "legendFormat": "4G Switches (VM1)"
+        },
+        {
+          "expr": "rate(node_context_switches_total{instance=\"vm2-5g-core\"}[1m])",
+          "legendFormat": "5G Switches (VM2)"
+        }
+      ]
+    },
+    {
+      "title": "Disk Activity",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 24 },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "vertical"
+      },
+      "targets": [
+        {
+          "expr": "rate(node_disk_written_bytes_total{instance=\"vm1-4g-core\"}[1m]) / 1024",
+          "legendFormat": "4G Disk (VM1)"
+        },
+        {
+          "expr": "rate(node_disk_written_bytes_total{instance=\"vm2-5g-core\"}[1m]) / 1024",
+          "legendFormat": "5G Disk (VM2)"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 30,
+  "style": "dark",
+  "tags": ["5g", "4g", "comparison"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "4G vs 5G Performance Comparison",
+  "uid": "4g-5g-comp",
+  "version": 1
+}
