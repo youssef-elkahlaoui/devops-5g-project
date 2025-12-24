@@ -24,6 +24,7 @@
         - apt-daily.service
         - apt-daily.timer
         - unattended-upgrades
+      ignore_errors: yes
 
     - name: Create 4GB swap
       shell: |
@@ -37,10 +38,16 @@
       args:
         creates: /swapfile
 
-    - name: Enable SCTP
+    - name: Enable SCTP module
       modprobe:
         name: sctp
         state: present
+
+    - name: Persist SCTP module on boot
+      lineinfile:
+        path: /etc/modules-load.d/sctp.conf
+        line: sctp
+        create: yes
 
     - name: Configure DNS
       copy:
@@ -64,6 +71,7 @@
           - cmake
           - net-tools
           - iptables
+          - iptables-persistent
           - iputils-ping
           - tcpdump
           - libsctp-dev
@@ -74,6 +82,7 @@
           - libboost-system-dev
           - libboost-test-dev
           - libconfig++-dev
+        state: present
 
     # =================================================
     # 2. MONGODB 8.0
@@ -126,6 +135,11 @@
         state: started
         enabled: yes
 
+    - name: Wait for MongoDB to be ready
+      wait_for:
+        port: 27017
+        timeout: 60
+
     # =================================================
     # 3. OPEN5GS EPC
     # =================================================
@@ -143,28 +157,76 @@
           - open5gs-hss
           - open5gs-upf
           - open5gs-pcrf
+        state: present
 
     - name: Configure MME
       copy:
         dest: /etc/open5gs/mme.yaml
         content: |
           mme:
+            freeDiameter: /etc/freeDiameter/mme.conf
             s1ap:
               - addr: {{ vm1_ip }}
             gtpc:
               - addr: {{ vm1_ip }}
             gummei:
-              plmn_id: { mcc: 001, mnc: 01 }
+              plmn_id:
+                mcc: 001
+                mnc: 01
               mme_gid: 2
               mme_code: 1
             tai:
-              plmn_id: { mcc: 001, mnc: 01 }
+              plmn_id:
+                mcc: 001
+                mnc: 01
               tac: 1
-            network_name: { full: Open5GS-4G }
+            security:
+              integrity_order: [EIA2, EIA1, EIA0]
+              ciphering_order: [EEA0, EEA1, EEA2]
+            network_name:
+              full: Open5GS-4G
             metrics:
               server:
                 - address: 0.0.0.0
                   port: 9090
+      notify: Restart Open5GS
+
+    - name: Configure SGW-C
+      copy:
+        dest: /etc/open5gs/sgwc.yaml
+        content: |
+          sgwc:
+            gtpc:
+              - addr: {{ vm1_ip }}
+            pfcp:
+              - addr: {{ vm1_ip }}
+      notify: Restart Open5GS
+
+    - name: Configure SGW-U
+      copy:
+        dest: /etc/open5gs/sgwu.yaml
+        content: |
+          sgwu:
+            gtpu:
+              - addr: {{ vm1_ip }}
+            pfcp:
+              - addr: {{ vm1_ip }}
+      notify: Restart Open5GS
+
+    - name: Configure HSS
+      copy:
+        dest: /etc/open5gs/hss.yaml
+        content: |
+          hss:
+            freeDiameter: /etc/freeDiameter/hss.conf
+      notify: Restart Open5GS
+
+    - name: Configure PCRF
+      copy:
+        dest: /etc/open5gs/pcrf.yaml
+        content: |
+          pcrf:
+            freeDiameter: /etc/freeDiameter/pcrf.conf
       notify: Restart Open5GS
 
     - name: Configure UPF
@@ -176,6 +238,7 @@
               - addr: {{ vm1_ip }}
             subnet:
               - addr: 10.45.0.1/16
+                dnn: internet
             metrics:
               server:
                 - address: 0.0.0.0
@@ -189,6 +252,8 @@
       sysctl:
         name: net.ipv4.ip_forward
         value: "1"
+        sysctl_set: yes
+        state: present
         reload: yes
 
     - name: Enable NAT for UE traffic
@@ -197,6 +262,19 @@
         chain: POSTROUTING
         source: "{{ ue_subnet }}"
         jump: MASQUERADE
+        comment: "Open5GS UE NAT"
+
+    - name: Save iptables rules
+      shell: iptables-save > /etc/iptables/rules.v4
+      args:
+        creates: /etc/iptables/rules.v4
+
+    - name: Ensure iptables-persistent is configured
+      debconf:
+        name: iptables-persistent
+        question: iptables-persistent/autosave_v4
+        value: "true"
+        vtype: boolean
 
     # =================================================
     # 5. SRSRAN (ZMQ MODE)
@@ -205,6 +283,8 @@
       git:
         repo: https://github.com/srsran/srsRAN_4G.git
         dest: /opt/srsran
+        version: master
+        force: yes
 
     - name: Build and install srsRAN
       shell: |
@@ -216,6 +296,7 @@
       args:
         chdir: /opt/srsran
         creates: /usr/local/bin/srsenb
+
     - name: Create srsRAN config directory
       file:
         path: /etc/srsran
@@ -230,7 +311,7 @@
         content: |
           [rf]
           device_name = zmq
-          device_args = tx_port=tcp://*:2000,rx_port=tcp://localhost:2001
+          device_args = tx_port=tcp://*:2000,rx_port=tcp://localhost:2001,id=enb,base_srate=23.04e6
 
           [enb]
           enb_id = 0x19B
@@ -239,11 +320,93 @@
           mme_addr = {{ vm1_ip }}
           gtp_bind_addr = {{ vm1_ip }}
           s1c_bind_addr = {{ vm1_ip }}
+          n_prb = 50
+          
+          [enb_files]
+          sib_config = /etc/srsran/sib.conf
+          rr_config = /etc/srsran/rr.conf
+          rb_config = /etc/srsran/rb.conf
+
+    - name: Configure srsRAN UE
+      copy:
+        dest: /etc/srsran/ue.conf
+        content: |
+          [rf]
+          device_name = zmq
+          device_args = tx_port=tcp://*:2001,rx_port=tcp://localhost:2000,id=ue,base_srate=23.04e6
+
+          [usim]
+          mode = soft
+          algo = milenage
+          opc  = E8ED289DEBA952E4283B54E88E6183CA
+          k    = 465B5CE8B199B49FAA5F0A2EE238A6BC
+          imsi = 001010000000001
+          imei = 353490069873319
+
+          [nas]
+          apn = internet
+          apn_protocol = ipv4
+
+    - name: Copy default srsRAN config files
+      shell: |
+        if [ ! -f /etc/srsran/sib.conf ]; then
+          cp /opt/srsran/srsenb/sib.conf.example /etc/srsran/sib.conf
+        fi
+        if [ ! -f /etc/srsran/rr.conf ]; then
+          cp /opt/srsran/srsenb/rr.conf.example /etc/srsran/rr.conf
+        fi
+        if [ ! -f /etc/srsran/rb.conf ]; then
+          cp /opt/srsran/srsenb/rb.conf.example /etc/srsran/rb.conf
+        fi
+      args:
+        creates: /etc/srsran/sib.conf
+
+    - name: Create srsRAN eNB systemd service
+      copy:
+        dest: /etc/systemd/system/srsenb.service
+        content: |
+          [Unit]
+          Description=srsRAN eNodeB
+          After=network.target open5gs-mme.service
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/srsenb /etc/srsran/enb.conf
+          Restart=on-failure
+          RestartSec=5
+          StandardOutput=journal
+          StandardError=journal
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Create srsRAN UE systemd service
+      copy:
+        dest: /etc/systemd/system/srsue.service
+        content: |
+          [Unit]
+          Description=srsRAN UE
+          After=network.target srsenb.service
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/srsue /etc/srsran/ue.conf
+          Restart=on-failure
+          RestartSec=5
+          StandardOutput=journal
+          StandardError=journal
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
 
     # =================================================
     # 6. OPEN5GS WEBUI
     # =================================================
-    - name: Install Node.js
+    - name: Install Node.js repository
       shell: curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
       args:
         creates: /etc/apt/sources.list.d/nodesource.list
@@ -252,11 +415,12 @@
       apt:
         name: nodejs
         state: present
+        update_cache: yes
 
     - name: Install Open5GS WebUI
       shell: curl -fsSL https://open5gs.org/open5gs/assets/webui/install | bash -
       args:
-        creates: /usr/lib/node_modules/open5gs/server/index.js
+        creates: /usr/lib/node_modules/open5gs
 
     - name: Bind WebUI to all interfaces
       replace:
@@ -264,6 +428,37 @@
         regexp: "localhost"
         replace: "0.0.0.0"
       notify: Restart Open5GS WebUI
+
+    - name: Create Open5GS WebUI systemd service
+      copy:
+        dest: /etc/systemd/system/open5gs-webui.service
+        content: |
+          [Unit]
+          Description=Open5GS WebUI
+          After=network.target mongodb.service
+
+          [Service]
+          Type=simple
+          User=root
+          WorkingDirectory=/usr/lib/node_modules/open5gs
+          ExecStart=/usr/bin/node server/index.js
+          Restart=always
+          RestartSec=5
+          StandardOutput=journal
+          StandardError=journal
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd for WebUI
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Open5GS WebUI
+      systemd:
+        name: open5gs-webui
+        enabled: yes
+        state: started
 
     # =================================================
     # 7. NODE EXPORTER
@@ -285,10 +480,11 @@
     # =================================================
     # 8. ADD TEST SUBSCRIBER
     # =================================================
-    - name: Wait for MongoDB
+    - name: Wait for MongoDB to be fully ready
       wait_for:
         port: 27017
-        timeout: 30
+        timeout: 60
+        delay: 5
 
     - name: Insert test UE subscriber
       shell: |
@@ -297,18 +493,111 @@
           {imsi:"001010000000001"},
           {$set:{
             imsi:"001010000000001",
+            msisdn: [],
+            imeisv: "4370816125816151",
+            mme_host: [],
+            mm_realm: [],
+            purge_flag: [],
             security:{
               k:"465B5CE8B199B49FAA5F0A2EE238A6BC",
               opc:"E8ED289DEBA952E4283B54E88E6183CA",
-              amf:"8000"
+              amf:"8000",
+              sqn: NumberLong("0")
             },
-            slice:[{sst:1,default_indicator:true,
-            session:[{name:"internet",type:3}]}]
+            ambr: {
+              downlink: { value: 1, unit: 3 },
+              uplink: { value: 1, unit: 3 }
+            },
+            slice:[{
+              sst:1,
+              default_indicator:true,
+              session:[{
+                name:"internet",
+                type:3,
+                ambr: {
+                  downlink: { value: 1, unit: 3 },
+                  uplink: { value: 1, unit: 3 }
+                },
+                qos: {
+                  index: 9,
+                  arp: {
+                    priority_level: 8,
+                    pre_emption_capability: 1,
+                    pre_emption_vulnerability: 1
+                  }
+                }
+              }]
+            }],
+            access_restriction_data: 32,
+            subscriber_status: 0,
+            network_access_mode: 0,
+            subscribed_rau_tau_timer: 12
           }},
           {upsert:true}
         )'
       args:
         executable: /bin/bash
+      register: subscriber_result
+      changed_when: "'upserted' in subscriber_result.stdout or 'modified' in subscriber_result.stdout"
+
+    - name: Verify subscriber was added
+      shell: |
+        mongosh open5gs --quiet --eval 'db.subscribers.findOne({imsi:"001010000000001"})' | grep -q "001010000000001"
+      register: verify_subscriber
+      failed_when: verify_subscriber.rc != 0
+      changed_when: false
+
+    # =================================================
+    # 9. VALIDATION & HEALTH CHECKS
+    # =================================================
+    - name: Verify Open5GS services are running
+      systemd:
+        name: "{{ item }}"
+        state: started
+      loop:
+        - open5gs-mmed
+        - open5gs-sgwcd
+        - open5gs-sgwud
+        - open5gs-hssd
+        - open5gs-upfd
+        - open5gs-pcrfd
+
+    - name: Check Open5GS service status
+      command: systemctl is-active {{ item }}
+      loop:
+        - open5gs-mmed
+        - open5gs-sgwcd
+        - open5gs-sgwud
+        - open5gs-hssd
+        - open5gs-upfd
+        - open5gs-pcrfd
+      register: service_status
+      failed_when: service_status.rc != 0
+      changed_when: false
+
+    - name: Display deployment summary
+      debug:
+        msg:
+          - "=========================================="
+          - "VM1 4G Core Deployment Complete!"
+          - "=========================================="
+          - "Open5GS WebUI: http://{{ vm1_ip }}:9999"
+          - "  Default credentials: admin / 1423"
+          - ""
+          - "Prometheus Metrics:"
+          - "  MME: http://{{ vm1_ip }}:9090/metrics"
+          - "  UPF: http://{{ vm1_ip }}:9092/metrics"
+          - "  Node Exporter: http://{{ vm1_ip }}:9100/metrics"
+          - ""
+          - "Test Subscriber:"
+          - "  IMSI: 001010000000001"
+          - "  K: 465B5CE8B199B49FAA5F0A2EE238A6BC"
+          - "  OPC: E8ED289DEBA952E4283B54E88E6183CA"
+          - ""
+          - "To start srsRAN:"
+          - "  sudo systemctl start srsenb"
+          - "  sudo systemctl start srsue"
+          - "=========================================="
 
   # =================================================
   # HANDLERS
