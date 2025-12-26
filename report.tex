@@ -1,0 +1,2437 @@
+\documentclass[12pt,a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{url}
+\usepackage{cite}
+
+% --- Couleurs pour le code ---
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+% --- Configuration de listings ---
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single
+}
+\lstset{style=mystyle}
+
+% --- En-têtes de page ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{\thepage}
+
+% --- Formatage des titres ---
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{1em}{}
+
+\begin{document}
+
+% --- Page de titre ---
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    
+    % --- Titres ---
+    {\Huge\bfseries Automatisation du Cycle de Vie des Réseaux 4G et 5G \par}
+    \vspace{1cm}
+    {\Large\bfseries Migration Infrastructurelle Multi-Instance sous Open5GS via l'Orchestration DevOps sur GCP\par}
+    \vspace{2cm}
+    
+    % --- Informations ---
+    {\Large Auteurs :\par}
+    \vspace{0.3cm}
+    {\large Youssef El Kahlaoui\par}
+    {\large Ayoub Gorry\par}
+    {\large Anass Essafi\par}
+    \vspace{1cm}
+    
+    {\Large Institution :\par}
+    \vspace{0.3cm}
+    {\large École Nationale des Sciences Appliquées (ENSA) - Al Hoceima\par}
+    {\large Département IA et Transformation Digitale\par}
+    \vspace{1cm}
+    
+    {\Large Encadrant :\par}
+    \vspace{0.3cm}
+    {\large Pr A. Bahri\par}
+    {\large Professeur/chercheur\par}
+    \vspace{1cm}
+    
+    {\Large Date de soumission :\par}
+    \vspace{0.3cm}
+    {\large 25 décembre 2025\par}
+    
+    % --- Bloc Résumé (Centré sur la page, mais texte justifié) ---
+    \vfill 
+    \vspace{15cm}
+
+    {\Large\bfseries Résumé\par}
+    \vspace{0.5cm}
+    
+    \begin{minipage}{0.85\textwidth} % Largeur du bloc (85% de la page)
+        \setlength{\parindent}{0pt} % Supprime l'alinéa pour le résumé
+        Ce rapport présente une implémentation DevOps~\cite{devops-culture} complète pour le déploiement et la comparaison des architectures de réseaux core 4G et 5G sur Google Cloud Platform (GCP)~\cite{gcp-docs}. Le projet utilise une architecture 3-VM isolée sophistiquée où chaque machine virtuelle sert un objectif distinct : VM1 dédiée au réseau core 4G avec Open5GS EPC et srsRAN, VM2 dédiée au réseau core 5G avec Open5GS 5GC et UERANSIM, et VM3 fournissant un monitoring et une observabilité centralisés via Prometheus et Grafana.
+        \par\vspace{0.3cm}
+        L'implémentation démontre les différences fondamentales entre les technologies 4G et 5G du point de vue de l'architecture cloud, soulignant les caractéristiques cloud-native supérieures de la 5G. Grâce à l'Infrastructure as Code (IaC) utilisant Terraform, au déploiement automatisé avec Ansible et au monitoring complet, le projet atteint un statut prêt pour la production avec des capacités d'isolation, de sécurité et de benchmarking de performance complètes.
+        \par\vspace{0.3cm}
+        Les réalisations clés incluent les pipelines de déploiement automatisés, l'implémentation de la sécurité de la passerelle API, le monitoring de performance en temps réel, et les frameworks de comparaison scientifique. L'architecture démontre avec succès les avantages de la 5G dans les environnements cloud tout en maintenant la compatibilité ascendante et l'excellence opérationnelle.
+        
+        \vspace{0.8cm}
+        {\bfseries Mots-clés:} Réseau Core 5G, Open5GS, DevOps, GCP, Infrastructure as Code, Virtualisation des Fonctions Réseau, Prometheus, Grafana, Sécurité de la Passerelle API.
+    \end{minipage}
+
+\end{titlepage}
+
+% Table of Contents
+\tableofcontents
+\newpage
+
+% List of Figures
+\listoffigures
+% \newpage
+% \begin{figure}[H] % [H] fixe l'image exactement ici
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{chemin/vers/votre_image.png} 
+%     \caption{Schéma détaillé de l'architecture Open5GS sur GCP} % Ce titre va dans la Liste des Figures
+%     \label{fig:arch_5g} % Pour citer l'image dans le texte : \ref{fig:arch_5g}
+% \end{figure}
+% List of Tables
+\listoftables
+\newpage
+% --- Liste des Abréviations ---
+\section*{Liste des Abréviations}
+\begin{itemize}[label=--]
+    \item 4G : Quatrième Génération de Réseaux Mobiles
+    \item 5G : Cinquième Génération de Réseaux Mobiles
+    \item 5GC : Réseau Core 5G
+    \item AMF : Fonction de Gestion d'Accès et de Mobilité
+    \item API : Interface de Programmation d'Application
+    \item CI/CD : Intégration Continue / Déploiement Continu
+    \item CN : Réseau Core
+    \item DevOps : Développement \& Opérations
+    \item EPC : Evolved Packet Core
+    \item GCP : Google Cloud Platform
+    \item GTP : Protocole de Tunnellisation GPRS
+    \item IaC : Infrastructure as Code
+    \item LTE : Long Term Evolution
+    \item MME : Mobility Management Entity
+    \item NFV : Virtualisation des Fonctions Réseau
+    \item NRF : Network Repository Function
+    \item PCF : Policy Control Function
+    \item PCRF : Policy and Charging Rules Function
+    \item PGW : Packet Data Network Gateway
+    \item RAN : Réseau d'Accès Radio
+    \item SBI : Service-Based Interface
+    \item SDN : Software Defined Networking
+    \item SGW : Serving Gateway
+    \item SMF : Session Management Function
+    \item UDM : Unified Data Management
+    \item UPF : User Plane Function
+    \item VM : Machine Virtuelle
+    \item VPC : Virtual Private Cloud
+\end{itemize}
+
+\newpage
+
+% --- Chapitre 1 ---
+\chapter{Architecture du Réseau 4G et Implémentation VM1}
+
+\section{Introduction aux Réseaux 4G}
+
+Les réseaux mobiles de quatrième génération (4G), principalement basés sur la technologie Long Term Evolution (LTE), représentent une évolution significative par rapport aux générations précédentes. Les réseaux 4G ont introduit des améliorations majeures en termes de débits de données, de latence et d'architecture réseau par rapport aux systèmes 3G \cite{3gpp-4g}.
+
+\subsection{Contexte Historique}
+
+Les réseaux 4G ont émergé en réponse à la demande croissante de services de données mobiles, de streaming vidéo et d'applications en temps réel. La norme LTE, développée par le consortium 3GPP, est devenue la base des réseaux 4G dans le monde entier \cite{3gpp-4g}.
+
+\subsection{Architecture du Réseau Core 4G}
+
+Le réseau core 4G, connu sous le nom d'Evolved Packet Core (EPC), a introduit une architecture plus plate par rapport aux réseaux commutés par circuits de la 3G \cite{3gpp-4g}. L'EPC se compose de plusieurs fonctions réseau clés :
+
+
+
+\begin{itemize}
+    \item \textbf{Mobility Management Entity (MME)} : Gère la signalisation, la gestion de mobilité et l'établissement de session.
+    \item \textbf{Serving Gateway (SGW)} : Route les paquets de données utilisateur et agit comme ancre de mobilité.
+    \item \textbf{Packet Data Network Gateway (PGW)} : Fournit la connectivité aux réseaux de données paquets externes.
+    \item \textbf{Home Subscriber Server (HSS)} : Stocke les informations d'abonnés et les données d'authentification.
+    \item \textbf{Policy and Charging Rules Function (PCRF)} : Gère les règles de politique et de facturation.
+\end{itemize}
+
+\subsection{Caractéristiques Clés de la 4G}
+
+\begin{table}[H]
+\centering
+\caption{Caractéristiques du Réseau 4G}
+\label{tab:4g-characteristics}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Caractéristique & Spécification \\
+\midrule
+Débit de Données de Pointe & Jusqu'à 100 Mbps (descendant) \\
+Latence & 10--50 ms \\
+Architecture & Evolved Packet Core (EPC) \\
+Accès Radio & LTE / LTE-Advanced \\
+Bandes de Fréquence & 700 MHz -- 2.6 GHz \\
+Modulation & OFDM, MIMO \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Architecture et Conception VM1}
+
+La VM1 est dédiée à l'hébergement de l'infrastructure complète du réseau core 4G, fournissant l'isolation et les ressources nécessaires pour les charges de travail spécifiques à la 4G.
+
+\subsection{Spécifications VM1}
+
+\begin{table}[H]
+\centering
+\caption{Spécifications Techniques VM1}
+\label{tab:vm1-specs}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Composant & Spécification \\
+\midrule
+Nom d'Instance & vm1-4g-core \\
+Type de Machine & e2-medium (2 vCPU, 4GB RAM) \\
+IP Privée & 10.10.0.10 \\
+Système d'Exploitation & Ubuntu 22.04 LTS \\
+Taille du Disque & 50GB \\
+Tags & open5gs, 4g-core, srsran \\
+Accès Public & SSH, WebUI (Port 9999) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Architecture de la Pile Logicielle}
+
+La VM1 implémente une pile logicielle 4G complète conçue pour le déploiement cloud et les tests de performance.
+
+\subsubsection{Implémentation Open5GS EPC}
+
+Open5GS~\cite{open5gs-docs} fournit les fonctions réseau core pour les réseaux LTE 4G. L'implémentation EPC inclut :
+
+\begin{lstlisting}[caption=Composants Core Open5GS 4G, language=bash]
+# Fonctions Reseau Core sur VM1
+- MME (Mobility Management Entity)
+- SGW (Serving Gateway)
+- PGW (PDN Gateway)
+- HSS (Home Subscriber Server)
+- PCRF (Policy and Charging Rules Function)
+\end{lstlisting}
+
+\subsubsection{Réseau d'Accès Radio srsRAN}
+
+srsRAN~\cite{srsran-docs} fournit les composants du Réseau d'Accès Radio (RAN) pour les réseaux 4G :
+
+\begin{lstlisting}[caption=Composants srsRAN, language=bash]
+# Composants RAN
+- eNB (Evolved Node B) - Station de base
+- UE (User Equipment) - Simulation d'appareil mobile
+- Simulation de couche physique
+- Gestion des ressources radio
+\end{lstlisting}
+
+\subsubsection{Base de données MongoDB}
+
+MongoDB~\cite{mongodb-docs} sert de base de données pour les abonnés et le stockage de configuration :
+
+\begin{lstlisting}[caption=Configuration MongoDB, language=bash]
+# MongoDB pour les donnees d'abonnes
+- Profils d'abonnes
+- Vecteurs d'authentification
+- Configuration reseau
+- Persistance de session
+\end{lstlisting}
+
+\subsection{Interfaces Réseau et Ports}
+
+La VM1 expose plusieurs interfaces réseau pour différentes fonctions :
+
+\begin{table}[H]
+\centering
+\caption{Ports Réseau et Services VM1}
+\label{tab:vm1-ports}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Port & Protocole & Service \\
+\midrule
+22 & TCP & Gestion SSH \\
+9999 & TCP & WebUI Open5GS \\
+9090 & TCP & Métriques Open5GS \\
+9100 & TCP & Node Exporter \\
+36412 & SCTP & Signalisation MME (S1-MME) \\
+2123 & UDP & Contrôle GTP-C \\
+2152 & UDP & GTP-U User Plane \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\section{Implémentation du cœur 4G}
+
+\subsection{Infrastructure as Code avec Terraform}
+
+L'infrastructure de VM1 est définie à l'aide de Terraform~\cite{terraform-docs} pour des déploiements reproductibles :
+
+\begin{lstlisting}[caption=Configuration Terraform VM1, language=bash]
+# terraform-vm1-4g/main.tf
+resource "google_compute_instance" "vm1_4g_core" {
+  name         = "vm1-4g-core"
+  machine_type = "e2-medium"
+  zone         = var.zone
+
+  boot_disk {
+    initialize_params {
+      image = "ubuntu-os-cloud/ubuntu-2204-lts"
+      size  = 50
+    }
+  }
+
+  network_interface {
+    network    = var.network_name
+    subnetwork = var.subnet_name
+    network_ip = var.vm1_private_ip
+  }
+
+  tags = ["open5gs", "4g-core", "srsran"]
+}
+\end{lstlisting}
+
+\subsection{Déploiement automatisé avec Ansible}
+
+Les playbooks Ansible~\cite{ansible-docs} automatisent le déploiement complet du core 4G :
+
+\begin{lstlisting}[caption=Playbook Ansible - Déploiement 4G, language=bash]
+# ansible-vm1-4g/playbooks/deploy-4g-core.yml
+---
+- name: Deploy 4G Core Network
+  hosts: vm1
+  become: yes
+  
+  tasks:
+    - name: Install Open5GS EPC
+      include_role:
+        name: open5gs-epc
+        
+    - name: Install srsRAN
+      include_role:
+        name: srsran
+        
+    - name: Configure MongoDB
+      include_role:
+        name: mongodb
+        
+    - name: Setup monitoring
+      include_role:
+        name: monitoring
+\end{lstlisting}
+
+\subsection{Open5GS Configuration}
+
+La configuration Open5GS~\cite{open5gs-docs} définit les paramètres du réseau core 4G :
+
+\begin{lstlisting}[caption=Configuration Open5GS EPC, language=bash]
+# /etc/open5gs/mme.yaml
+mme:
+  s1ap:
+    addr: 10.10.0.10
+  gtpc:
+    addr: 10.10.0.10
+  metrics:
+    addr: 10.10.0.10
+    port: 9090
+
+sgw:
+  gtpc:
+    addr: 10.10.0.10
+  gtpu:
+    addr: 10.10.0.10
+
+pgw:
+  gtpc:
+    addr: 10.10.0.10
+  gtpu:
+    addr: 10.10.0.10
+\end{lstlisting}
+
+\subsection{Configuration srsRAN}
+
+srsRAN fournit la simulation de la couche physique pour les réseaux 4G :
+
+\begin{lstlisting}[caption=Configuration eNB srsRAN, language=bash]
+# /etc/srsran/enb.conf
+[enb]
+enb_id = 0x19B
+cell_id = 0x01
+tac = 0x0007
+mcc = 001
+mnc = 01
+
+[rf]
+tx_gain = 80
+rx_gain = 40
+
+[network]
+mme_addr = 10.10.0.10
+gtp_bind_addr = 10.10.0.10
+\end{lstlisting}
+
+\section{Services et API du réseau 4G}
+
+\subsection{Interface Web d'Open5GS}
+
+L'interface WebUI fournit des capacités de gestion et de surveillance :
+
+\begin{itemize}
+    \item Gestion des abonnés
+    \item Statistiques réseau
+    \item Surveillance en temps réel
+    \item Gestion de la configuration
+\end{itemize}
+
+\subsection{Métriques et supervision}
+
+Open5GS expose des métriques compatibles Prometheus~\cite{prometheus-docs} pour la supervision :
+
+\begin{lstlisting}[caption=Point d'accès métriques Open5GS, language=bash]
+# Metrics available at http://10.10.0.10:9090/metrics
+open5gs_mme_connected_subscribers 2
+open5gs_sgw_active_sessions 2
+open5gs_pgw_active_bearers 4
+\end{lstlisting}
+
+\subsection{Intégration de Node Exporter}
+
+Les métriques système sont collectées à l'aide de Node Exporter :
+
+\begin{lstlisting}[caption=Métriques Node Exporter, language=bash]
+# CPU, memory, disk, network metrics
+node_cpu_seconds_total{cpu="0",mode="idle"} 12345
+node_memory_MemTotal_bytes 4.294967296e+09
+node_network_receive_bytes_total{device="ens4"} 1.234567e+06
+\end{lstlisting}
+
+\section{Caractéristiques de performance 4G}
+
+\subsection{Utilisation des ressources}
+
+Les réseaux 4G avec simulation de la couche physique requièrent des ressources computationnelles importantes :
+
+\begin{table}[H]
+\centering
+\caption{Exigences de ressources du réseau 4G}
+\label{tab:4g-resources}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Composant & CPU Usage & Memory Usage \\
+\midrule
+Open5GS EPC & 10-20\% & 512MB \\
+srsRAN eNB & 60-80\% & 1GB \\
+srsRAN UE & 40-60\% & 512MB \\
+MongoDB & 5-10\% & 256MB \\
+Total & 80-100\% & 2.5GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Limitations de performance}
+
+Les principales limites de la 4G dans les environnements cloud incluent :
+
+\begin{enumerate}
+    \item \textbf{Simulation radio gourmande en CPU} : la simulation de la couche physique de srsRAN nécessite des calculs proches du DSP
+    \item \textbf{Surcharge de latence} : le traitement radio introduit des délais additionnels
+    \item \textbf{Contraintes de scalabilité} : une utilisation CPU élevée limite le nombre d'utilisateurs concurrents
+    \item \textbf{Dépendances matérielles} : la performance dépend de l'architecture et des capacités du processeur
+\end{enumerate}
+
+\subsection{Défis de déploiement dans le cloud}
+
+Les réseaux 4G font face à plusieurs défis dans les environnements cloud :
+
+\begin{itemize}
+    \item Traitement radio intensif en ressources
+    \item Performance variable selon les types d'instances
+    \item Sensibilité à la latence réseau
+    \item Difficultés d'optimisation des coûts
+\end{itemize}
+
+\section{Tests et validation 4G}
+
+\subsection{Vérification du déploiement}
+
+Le déploiement 4G inclut des procédures de test complètes :
+
+\begin{lstlisting}[caption=Vérification du déploiement 4G, language=bash]
+# Verify Open5GS services
+sudo systemctl status open5gs-mmed
+sudo systemctl status open5gs-sgwd
+sudo systemctl status open5gs-pgwd
+
+# Test WebUI access
+curl http://localhost:9999
+
+# Verify metrics collection
+curl http://localhost:9090/metrics | head -10
+\end{lstlisting}
+
+\subsection{Tests de connectivité réseau}
+
+Les tests vérifient la communication correcte entre les fonctions réseau :
+
+\begin{lstlisting}[caption=Tests de connectivité 4G, language=bash]
+# Test MME connectivity
+telnet 10.10.0.10 36412
+
+# Verify GTP tunnels
+sudo open5gs-cli status
+
+# Check subscriber database
+mongo --eval "db.subscribers.count()"
+\end{lstlisting}
+
+\subsection{Tests de performance}
+
+Les tests de performance 4G portent sur les mesures de débit et de latence :
+
+\begin{lstlisting}[caption=Tests de performance 4G, language=bash]
+# Install iperf for throughput testing
+sudo apt install iperf
+
+# Run throughput test
+iperf -c <external-server> -t 30 -i 5
+
+# Monitor system resources
+top -d 1
+\end{lstlisting}
+
+\section{Résumé}
+
+VM1 fournit un environnement complet et isolé pour le cœur 4G avec Open5GS EPC et srsRAN. Cette implémentation illustre l'approche traditionnelle des cœurs mobiles et met en évidence l'intensité de calcul de la couche physique. Bien que fonctionnelle et capable d'offrir des performances 4G réalistes, l'architecture révèle des limitations fondamentales que la 5G résout par des optimisations au niveau protocolaire.
+
+L'implémentation 4G sert de référence pour la comparaison avec les systèmes 5G, démontrant comment les architectures réseau héritées se comportent dans des environnements cloud et établissant des références de performance pour des analyses évolutives.
+
+\newpage
+
+% --- Chapitre 2: Réseau 5G et Implémentation VM2 ---
+\chapter{Architecture du Réseau 5G et Implémentation VM2}
+
+\section{Introduction aux Réseaux 5G}
+
+La cinquième génération (5G)~\cite{3gpp-5g,5g-architecture,network-slicing} des réseaux mobiles représente un changement de paradigme par rapport aux générations précédentes, introduisant une architecture cloud-native, le découpage de réseau (network slicing) et des interfaces basées sur des services.
+
+
+
+\subsection{Évolution et Objectifs du 5G}
+
+Les réseaux 5G ont été conçus pour remédier aux limites des réseaux 4G tout en permettant de nouveaux cas d'utilisation :
+
+\begin{enumerate}
+    \item \textbf{Enhanced Mobile Broadband (eMBB)} : débits de données 10 à 100 fois supérieurs.
+    \item \textbf{Ultra-Reliable Low Latency Communications (URLLC)} : latence < 1 ms pour les applications critiques.
+    \item \textbf{Massive Machine Type Communications (mMTC)} : prise en charge d'une densité massive d'objets connectés (IoT).
+\end{enumerate}
+
+\subsection{Architecture du Réseau Core 5G}
+
+Le Réseau Core 5G (5GC) introduit une architecture basée sur des services (SBA) fondamentalement différente de l'EPC de la 4G :
+
+\begin{itemize}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\linewidth]{Experimental-5G-environment-of-a-5G-mobile-network-UERANSIM-Open5GS.png}
+    \caption{Schéma détaillé de l'architecture Open5GS sur GCP} % Ce titre va dans la Liste des Figures
+    \label{fig:placeholder}
+\end{figure}
+    \item \textbf{AMF (Access and Mobility Management Function)} : Gère l'accès et la mobilité des terminaux.
+    \item \textbf{SMF (Session Management Function)} : Gère les sessions et l'allocation d'adresses IP.
+    \item \textbf{UPF (User Plane Function)} : Gère l'acheminement des données utilisateur (plan de données).
+    \item \textbf{NRF (Network Repository Function)} : Permet la découverte et l'enregistrement automatique des services.
+    \item \textbf{UDM (Unified Data Management)} : Gestion centralisée des données d'abonnés.
+    \item \textbf{PCF (Policy Control Function)} : Contrôle des règles de politique et de facturation.
+\end{itemize}
+
+\subsection{Architecture Basée sur les Services (SBA)}
+
+Contrairement aux interfaces point à point propriétaires de la 4G, la 5G utilise des interfaces basées sur le protocole HTTP/2 (\textit{Service-Based Interfaces}, SBI)~\cite{3gpp-5g,cloud-native} pour la communication entre fonctions réseau (NFs), facilitant ainsi le déploiement de microservices.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\linewidth]{G-deployment-architecture-NSA-versus-SA-14.png}
+    \caption{Comparaison SA 5g vs NSA 5G}
+    \label{fig:placeholder}
+\end{figure}
+
+\subsection{Avantages Clés de la 5G}
+
+\begin{table}[H]
+\centering
+\caption{Comparaison 4G vs 5G}
+\label{tab:4g-5g-comparison}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Aspect & 4G (EPC) & 5G (5GC) & Amélioration \\
+\midrule
+Architecture & Monolithique & Basée sur services & Modularité accrue \\
+Latence & 10-50ms & <10ms & 5-10x plus faible \\
+Débit & 100Mbps & 10Gbps & 100x plus élevé \\
+Efficacité Énergétique & Modérée & Élevée & Réduction de 90\% \\
+Cloud Suitability & Limitée & Native & Support total \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Architecture et Conception de VM2}
+
+VM2 est dédiée aux fonctions du réseau core 5G, démontrant une architecture cloud-native isolée du reste de l'infrastructure.
+
+\subsection{Spécifications VM2}
+
+\begin{table}[H]
+\centering
+\caption{Spécifications Techniques VM2}
+\label{tab:vm2-specs}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Composant & Spécification \\
+\midrule
+Nom d'Instance & vm2-5g-core \\
+Type de Machine & e2-medium (2 vCPU, 4GB RAM) \\
+IP Privée & 10.10.0.20 \\
+Système d'Exploitation & Ubuntu 22.04 LTS \\
+Taille du Disque & 50GB \\
+Tags & open5gs, 5g-core, ueransim \\
+Accès Public & SSH, WebUI (9999) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Pile logicielle 5G}
+
+VM2 implémente un réseau core 5G complet en utilisant des composants optimisés pour le cloud.
+
+\subsubsection{Implémentation Open5GS 5GC}
+
+Les fonctions du réseau core 5G sont implémentées via la suite Open5GS :
+
+\begin{lstlisting}[caption=Composants Core Open5GS 5G, language=bash]
+# Fonctions Réseau 5G déployées sur VM2
+- NRF (Network Repository Function)
+- AMF (Access and Mobility Management Function)
+- SMF (Session Management Function)
+- UPF (User Plane Function)
+- UDM (Unified Data Management)
+- PCF (Policy Control Function)
+- AUSF (Authentication Server Function)
+- UDR (Unified Data Repository)
+- NSSF (Network Slice Selection Function)
+\end{lstlisting}
+
+\subsubsection{Simulation Protocolaire UERANSIM}
+
+Contrairement à srsRAN utilisé en 4G, UERANSIM~\cite{ueransim-docs} fournit une simulation au niveau protocolaire, ce qui est idéal pour tester les flux 5G sans la charge CPU d'une couche physique réelle :
+
+\begin{lstlisting}[caption=Composants UERANSIM, language=bash]
+# Simulation au niveau protocole
+- gNB (Next Generation Node B)
+- UE (User Equipment)
+- Signalisation NAS et RRC
+- Pas de traitement de couche physique (DSP)
+\end{lstlisting}
+
+\subsubsection{Intégration MongoDB}
+
+MongoDB assure la persistance des données d'abonnés spécifiques à la 5G :
+
+\begin{lstlisting}[caption=Configuration MongoDB 5G, language=bash]
+# Base de données abonnés 5G
+- Mapping SUPI/IMSI
+- Clés d'authentification (K, OPC)
+- Profils de Network Slicing (S-NSSAI)
+- Paramètres QoS 5G
+\end{lstlisting}
+
+\subsection{Interfaces Réseau 5G}
+
+VM2 expose des interfaces réseau spécifiques aux flux de contrôle et de données 5G :
+
+\begin{table}[H]
+\centering
+\caption{Ports Réseau et Services VM2}
+\label{tab:vm2-ports}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Port & Protocole & Service \\
+\midrule
+22 & TCP & Gestion SSH \\
+7777 & TCP & SBI (Interface HTTP/2) \\
+9999 & TCP & WebUI Open5GS \\
+9090 & TCP & Métriques Open5GS \\
+38412 & SCTP & Signalisation AMF (NGAP) \\
+2152 & UDP & Plan Utilisateur GTP-U \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Implémentation du Réseau Core 5G}
+
+\subsection{Déploiement de l'Infrastructure}
+
+L'infrastructure de VM2 est déployée à l'aide de Terraform pour garantir une reproductibilité totale :
+
+\begin{lstlisting}[caption=Configuration Terraform VM2, language=bash]
+# terraform-vm2-5g/main.tf
+resource "google_compute_instance" "vm2_5g_core" {
+  name         = "vm2-5g-core"
+  machine_type = "e2-medium"
+  zone         = var.zone
+
+  boot_disk {
+    initialize_params {
+      image = "ubuntu-os-cloud/ubuntu-2204-lts"
+      size  = 50
+    }
+  }
+
+  network_interface {
+    network    = var.network_name
+    subnetwork = var.subnet_name
+    network_ip = "10.10.0.20"
+  }
+
+  tags = ["open5gs", "5g-core", "ueransim"]
+}
+\end{lstlisting}
+
+\subsection{Déploiement 5G Automatisé}
+
+Les rôles Ansible gèrent l'installation et la configuration post-déploiement :
+
+\begin{lstlisting}[caption=Playbook Ansible - Déploiement 5G, language=bash]
+# ansible-vm2-5g/playbooks/deploy-5g-core.yml
+---
+- name: Deploy 5G Core Network
+  hosts: vm2
+  become: yes
+  
+  tasks:
+    - name: Install Open5GS 5GC
+      include_role:
+        name: open5gs-5gc
+        
+    - name: Install UERANSIM
+      include_role:
+        name: ueransim
+        
+    - name: Setup monitoring agents
+      include_role:
+        name: monitoring
+\end{lstlisting}
+
+\subsection{Configuration Open5GS 5G}
+
+La configuration du core 5G définit les interfaces basées sur les services et les fonctions réseau.
+
+\begin{lstlisting}[caption=Open5GS 5G Configuration]
+# /etc/open5gs/amf.yaml
+amf:
+  sbi:
+    addr: 10.10.0.20
+    port: 7777
+  ngap:
+    addr: 10.10.0.20
+  metrics:
+    addr: 10.10.0.20
+    port: 9090
+
+smf:
+  sbi:
+    addr: 10.10.0.20
+    port: 7777
+  pfcp:
+    addr: 10.10.0.20
+
+upf:
+  sbi:
+    addr: 10.10.0.20
+    port: 7777
+  pfcp:
+    addr: 10.10.0.20
+  gtpu:
+    addr: 10.10.0.20
+\end{lstlisting}
+
+\subsection{Configuration UERANSIM}
+
+UERANSIM fournit une simulation efficace au niveau protocolaire :
+
+\begin{lstlisting}[caption=UERANSIM gNB Configuration]
+# /etc/ueransim/gnb.yaml
+mcc: '001'
+mnc: '01'
+nci: '0x000000010'  # NR Cell Identity
+idLength: 32
+tac: 1
+
+# AMF address for NGAP
+amfConfigs:
+  - address: 10.10.0.20
+    port: 38412
+
+# Network link simulation
+linkIp: 10.10.0.20
+linkPort: 2152
+\end{lstlisting}
+
+\section{Services Réseau 5G et API}
+
+\subsection{Interfaces Basées sur les Services (SBI)}
+
+La 5G introduit des interfaces SBI basées sur HTTP/2 pour la communication entre fonctions réseau :
+
+\begin{lstlisting}[caption=Exemple d'API SBI]
+# AMF Registration to NRF
+POST /nnrf-nfm/v1/nf-instances
+{
+  "nfInstanceId": "amf-001",
+  "nfType": "AMF",
+  "nfStatus": "REGISTERED",
+  "sbi": {
+    "addr": "10.10.0.20",
+    "port": 7777
+  }
+}
+\end{lstlisting}
+
+\subsection{Open5GS WebUI}
+
+L'interface WebUI 5G fournit des capacités de gestion complètes :
+
+\begin{itemize}
+    \item Surveillance de l'état des fonctions réseau
+    \item Gestion des abonnés avec prise en charge SUPI
+    \item Configuration des tranches réseau
+    \item Visualisation des métriques en temps réel
+    \item Gestion des politiques QoS
+\end{itemize}
+
+\subsection{Collecte avancée des métriques}
+
+Les réseaux 5G exposent des métriques détaillées pour chaque fonction réseau:
+
+\begin{lstlisting}[caption=Exemples de métriques 5G]
+# AMF metrics
+open5gs_amf_connected_ues 5
+open5gs_amf_registration_attempts_total 25
+
+# SMF metrics  
+open5gs_smf_active_sessions 5
+open5gs_smf_pdu_sessions_created_total 15
+
+# UPF metrics
+open5gs_upf_active_tunnels 8
+open5gs_upf_traffic_bytes_total 1.2e+09
+\end{lstlisting}
+
+\section{Caractéristiques de performance 5G}
+
+\subsection{Efficacité des ressources}
+
+Les réseaux 5G démontrent une efficacité cloud supérieure par rapport à la 4G :
+
+\begin{table}[H]
+\centering
+\caption{Exigences de ressources du réseau 5G}
+\label{tab:5g-resources}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Composant & Utilisation CPU & Utilisation mémoire \\
+\midrule
+Open5GS 5GC & 5-15\% & 256MB \\
+UERANSIM gNB & 5-10\% & 128MB \\
+UERANSIM UE & 2-5\% & 64MB \\
+MongoDB & 5-10\% & 256MB \\
+Total & 15-30\% & 1GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Avantages cloud-native}
+
+L'architecture basée sur les services de la 5G apporte des bénéfices cloud significatifs :
+
+\begin{enumerate}
+    \item \textbf{Faible utilisation des ressources} : la simulation au niveau protocolaire élimine le besoin en DSP
+    \item \textbf{Scalabilité horizontale} : les interfaces basées sur les services permettent la mise à l'échelle des microservices
+    \item \textbf{Gestion élastique des ressources} : les fonctions réseau peuvent s'adapter indépendamment
+    \item \textbf{Prêt pour les conteneurs} : une conception sans état favorise la conteneurisation
+\end{enumerate}
+
+\subsection{Métriques de performance}
+
+Les réseaux 5G obtiennent des caractéristiques de performance supérieures :
+
+\begin{itemize}
+    \item \textbf{Latence} : <10 ms de bout en bout
+    \item \textbf{Débit} : jusqu'à 10 Gbps (maximum théorique)
+    \item \textbf{Densité de connexion} : prise en charge de millions d'appareils
+    \item \textbf{Efficacité énergétique} : réduction de 90 % par rapport à la 4G
+\end{itemize}
+
+\section{Tests et validation 5G}
+
+\subsection{Vérification du déploiement}
+
+Des tests complets garantissent l'intégrité des fonctions réseau 5G :
+
+\begin{lstlisting}[caption=Vérification du déploiement 5G]
+# Verify 5G network functions
+sudo systemctl status open5gs-nrfd
+sudo systemctl status open5gs-amfd
+sudo systemctl status open5gs-smfd
+sudo systemctl status open5gs-upfd
+
+# Test SBI interfaces
+curl -k https://localhost:7777/nnrf-nfm/v1/nf-instances
+
+# Verify metrics collection
+curl http://localhost:9090/metrics | grep open5gs
+\end{lstlisting}
+
+\subsection{Tests des fonctions réseau}
+
+Les tests valident la communication basée sur les services :
+
+\begin{lstlisting}[caption=5G Network Function Testing]
+# Test AMF connectivity
+telnet 10.10.0.20 38412
+
+# Verify SBI communication
+sudo open5gs-cli status
+
+# Check subscriber registration
+mongo --eval "db.subscribers.findOne()"
+\end{lstlisting}
+
+\subsection{Benchmarking des performances}
+
+Les tests de performance 5G démontrent l'efficacité cloud-native :
+
+\begin{lstlisting}[caption=Tests de performance 5G]
+# Throughput testing
+iperf -c <external-server> -t 30 -i 5
+
+# Monitor resource usage
+top -d 1
+
+# Check network function metrics
+curl http://localhost:9090/metrics | grep open5gs
+\end{lstlisting}
+
+\section{Analyse comparative 4G vs 5G}
+
+\subsection{Différences architecturales}
+
+Les différences architecturales fondamentales entre la 4G et la 5G :
+
+\begin{table}[H]
+\centering
+\caption{Comparaison architecturale 4G vs 5G}
+\label{tab:architectural-comparison}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Aspect & 4G EPC & 5G 5GC & Amélioration \\
+\midrule
+Architecture & Monolithique & Basée sur les services & Modularité \\
+Interfaces & GTP, Diameter & HTTP/2 SBI & REST APIs \\
+Gestion d'état & Avec état & Sans état & Scalabilité \\
+Déploiement & Basé sur VM & Prêt pour conteneurs & Cloud-native \\
+Utilisation des ressources & élevée (80-100\%) & Faible (15-30\%) & Efficacité \\
+Latence & 10-50ms & <10ms & Performance \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Implications pour le déploiement cloud}
+
+La conception cloud-native de la 5G apporte des avantages opérationnels significatifs :
+
+\begin{enumerate}
+    \item \textbf{Efficacité des ressources} : utilisation CPU 5x moindre
+    \item \textbf{Scalabilité} : mise à l'échelle indépendante des fonctions réseau
+    \item \textbf{Elasticité} : allocation dynamique des ressources
+    \item \textbf{Optimisation des coûts} : meilleure utilisation des ressources
+\end{enumerate}
+
+\subsection{Validation des performances}
+
+Des tests empiriques démontrent la supériorité de la 5G dans les environnements cloud :
+
+\begin{itemize}
+    \item Utilisation CPU : 4G (80-100\%) vs 5G (15-30\%)
+    \item Efficacité mémoire : 4G (2,5 GB) vs 5G (1 GB)
+    \item Latence : 4G (35 ms) vs 5G (10 ms)
+    \item Scalabilité du débit : 4G (limité par le CPU) vs 5G (limité par le réseau)
+\end{itemize}
+
+\section{Résumé}
+
+VM2 illustre l'avenir des réseaux core mobiles grâce à l'architecture basée sur les services de la 5G. L'implémentation montre comment les principes de conception cloud-native permettent des déploiements réseau efficaces, évolutifs et rentables. En éliminant la complexité de la couche physique et en adoptant des interfaces basées sur des services, les réseaux 5G obtiennent des avantages fondamentaux par rapport aux architectures 4G traditionnelles.
+
+L'implémentation 5G sert de référence pour les architectures réseau modernes, démontrant comment l'infrastructure télécom peut tirer parti des principes du cloud computing pour une performance et une efficacité opérationnelle optimales.
+
+\newpage
+
+% Chapter 3: Testing, Monitoring and VM3
+\chapter{Tests, Monitoring et Implémentation VM3}
+
+\section{Introduction à la Surveillance Centralisée}
+
+La troisième machine virtuelle (VM3) fournit des capacités complètes d'observabilité et de tests pour l'infrastructure du réseau core 4G/5G. Cette approche de monitoring centralisée permet des comparaisons scientifiques et des analyses de performance.
+
+\subsection{Objectifs du Monitoring}
+
+La VM3 assume plusieurs fonctions critiques dans l'architecture réseau :
+
+\begin{enumerate}
+    \item \textbf{Collecte Centralisée de Métriques} : Agrégation des données de performance de VM1 et VM2
+    \item \textbf{Visualisation en Temps Réel} : Fournir des tableaux de bord pour la comparaison 4G vs 5G
+    \item \textbf{Sécurité de la Passerelle API} : Mettre en place un contrôle d'accès sécurisé pour les réseaux core
+    \item \textbf{Benchmarking de Performance} : Permettre des tests et analyses scientifiques
+\end{enumerate}
+
+\subsection{Pile d'Observabilité}
+
+VM3 implémente une pile de monitoring compléte en utilisant des outils standards de l'industrie : Prometheus~\cite{prometheus-docs}, Grafana~\cite{grafana-docs}, NGINX~\cite{nginx-docs} :
+
+\begin{itemize}
+    \item \textbf{Prometheus} : Collecte et stockage de métriques séries temporelles
+    \item \textbf{Grafana} : Visualisation et création de tableaux de bord
+    \item \textbf{NGINX} : Passerelle API avec fonctionnalités de sécurité
+    \item \textbf{Node Exporter} : Collecte de métriques au niveau systéme
+\end{itemize}
+
+\section{Architecture et Conception de VM3}
+
+\subsection{Spécifications VM3}
+
+VM3 est optimisée pour les charges de travail de monitoring avec une allocation de ressources adaptée :
+
+\begin{table}[H]
+\centering
+\caption{Sp\'ecifications techniques VM3}
+\label{tab:vm3-specs}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Composant & Sp\'ecification \\
+\midrule
+Instance Name & vm3-monitoring \\
+Machine Type & e2-medium (2 vCPU, 4GB RAM) \\
+Private IP & 10.10.0.30 \\
+Operating System & Ubuntu 22.04 LTS \\
+Disk Size & 50GB \\
+Tags & monitoring, prometheus, grafana \\
+Public Access & SSH, Grafana (3000), API Gateway (80) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Pile Logicielle de Monitoring}
+
+VM3 implémente une plateforme d'observabilité compléte :
+
+\subsubsection{Configuration Prometheus}
+
+Prometheus collecte des métriques depuis toutes les VM de l'architecture :
+
+\begin{lstlisting}[caption=Prometheus Configuration]
+# /etc/prometheus/prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'open5gs-4g-core'
+    static_configs:
+      - targets: ['10.10.0.10:9090']
+
+  - job_name: 'node-vm1-4g'
+    static_configs:
+      - targets: ['10.10.0.10:9100']
+
+  - job_name: 'open5gs-5g-core'
+    static_configs:
+      - targets: ['10.10.0.20:9090']
+
+  - job_name: 'node-vm2-5g'
+    static_configs:
+      - targets: ['10.10.0.20:9100']
+
+  - job_name: 'node-vm3-monitoring'
+    static_configs:
+      - targets: ['localhost:9100']
+
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['localhost:9113']
+\end{lstlisting}
+
+\subsubsection{Configuration du tableau de bord Grafana}
+
+Grafana fournit la visualisation pour la comparaison des performances 4G vs 5G :
+
+\begin{lstlisting}[caption=Structure du tableau de bord Grafana]
+# Panneaux du tableau :
+- Comparaison d'utilisation CPU (4G vs 5G)
+- Analyse de l'utilisation m\'emoire
+- Mesures du d\'ebit r\'eseau
+- Mesures de latence
+- Surveillance des sessions actives
+- Comparaison de la charge syst\'eme
+- Mesures des requ\'etes sur la passerelle API
+\end{lstlisting}
+
+\subsubsection{NGINX API Gateway}
+
+La passerelle API (NGINX)~\cite{nginx-docs} fournit un accés sécurisé aux fonctions core du réseau :
+
+\begin{lstlisting}[caption=API Gateway Configuration]
+# /etc/nginx/sites-available/api-gateway
+server {
+    listen 80;
+    server_name api-gateway;
+
+    # Authentification
+    auth_basic "5G Control Plane";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+
+    # Limitation de d\'ebit (comment\'ee pour les tests)
+    # limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+    location /smf {
+        proxy_pass http://10.10.0.10:7777;
+        proxy_set_header Host $host;
+    }
+
+    location /amf {
+        proxy_pass http://10.10.0.20:7777;
+        proxy_set_header Host $host;
+    }
+
+    # Metrics endpoint
+    location /nginx_status {
+        stub_status on;
+        allow 127.0.0.1;
+        deny all;
+    }
+}
+\end{lstlisting}
+
+\section{Impl\'ementation du monitoring}
+
+\subsection{D\'eploiement de l'infrastructure}
+
+L'infrastructure de VM3 est déployée é l'aide de Terraform avec des configurations spécifiques au monitoring :
+
+\begin{lstlisting}[caption=Configuration Terraform VM3]
+# terraform-vm3-monitoring/main.tf
+resource "google_compute_instance" "vm3_monitoring" {
+  name         = "vm3-monitoring"
+  machine_type = "e2-medium"
+  zone         = var.zone
+
+  boot_disk {
+    initialize_params {
+      image = "ubuntu-os-cloud/ubuntu-2204-lts"
+      size  = 50
+    }
+  }
+
+  network_interface {
+    network    = var.network_name
+    subnetwork = var.subnet_name
+    network_ip = var.vm3_private_ip
+  }
+
+  tags = ["monitoring", "prometheus", "grafana"]
+}
+\end{lstlisting}
+
+\subsection{Déploiement automatisé de la supervision}
+
+Ansible automatise le déploiement complet de la pile de monitoring :
+
+\begin{lstlisting}[caption=Playbook Ansible - Déploiement Monitoring]
+# ansible-vm3-monitoring/playbooks/deploy-monitoring.yml
+---
+- name: Deploy Monitoring Stack
+  hosts: vm3
+  become: yes
+  
+  tasks:
+    - name: Install Prometheus
+      include_role:
+        name: prometheus
+        
+    - name: Install Grafana
+      include_role:
+        name: grafana
+        
+    - name: Install NGINX API Gateway
+      include_role:
+        name: nginx-gateway
+        
+    - name: Configure monitoring
+      include_role:
+        name: monitoring-setup
+\end{lstlisting}
+
+\subsection{Configuration du service Prometheus}
+
+Prometheus s'exécute en tant que service systemd avec une surveillance compléteé:
+
+\begin{lstlisting}[caption=Prometheus Service Configuration]
+# /etc/systemd/system/prometheus.service
+[Unit]
+Description=Prometheus
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+ExecStart=/usr/local/bin/prometheus \
+  --config.file /etc/prometheus/prometheus.yml \
+  --storage.tsdb.path /var/lib/prometheus/ \
+  --web.console.templates=/etc/prometheus/consoles \
+  --web.console.libraries=/etc/prometheus/console_libraries
+
+[Install]
+WantedBy=multi-user.target
+\end{lstlisting}
+
+\section{Implémentation de la sécurité de la passerelle API}
+
+\subsection{Configuration de l'authentification}
+
+La passerelle API met en éuvre une authentification HTTP basique pour protéger le réseau coreé:
+
+\begin{lstlisting}[caption=HTTP Basic Authentication Setup]
+# Create htpasswd file
+sudo htpasswd -c /etc/nginx/.htpasswd user
+# Enter password when prompted
+
+# File contents
+user:$apr1$abcdefgh$ijklmnopqrstuvwxyz123456
+\end{lstlisting}
+
+\subsection{Conception de la limitation de débit}
+
+La limitation de débit protége contre les attaques DDoS et les scénarios de surchargeé:
+
+\begin{lstlisting}[caption=Rate Limiting Configuration]
+# In nginx.conf (http block)
+limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+# In server block
+location /smf {
+    limit_req zone=api burst=5 nodelay;
+    proxy_pass http://10.10.0.10:7777;
+}
+
+location /amf {
+    limit_req zone=api burst=5 nodelay;
+    proxy_pass http://10.10.0.20:7777;
+}
+\end{lstlisting}
+
+\subsection{Procédures de test de sécurité}
+
+Une validation de sécurité compléte garantit l'efficacité de la passerelle APIé:
+
+\begin{lstlisting}[caption=Security Testing Commands]
+# Test unauthorized access (should return 401)
+curl -v http://136.116.182.39/smf
+
+# Test authorized access (should proxy to backend)
+curl -v -u user:password http://136.116.182.39/smf
+
+# Test invalid credentials (should return 401)
+curl -v -u user:wrongpassword http://136.116.182.39/smf
+
+# Test rate limiting (rapid requests)
+for i in {1..15}; do
+  curl -s -u user:password http://136.116.182.39/smf | head -1
+  sleep 0.1
+done
+\end{lstlisting}
+
+\section{Performance Testing Framework}
+
+\subsection{4G vs 5G Comparative Testing}
+
+Le cadre de test permet une comparaison scientifique entre les générations de réseaux :
+
+\subsubsection{Méthodologie de test}
+
+\begin{enumerate}
+    \item \textbf{établissement de la référence (Baseline)} : Exécuter le test 4G et collecter les métriques
+    \item \textbf{Réinitialisation du systéme} : Arréter la 4G, démarrer le céur 5G
+    \item \textbf{Tests comparatifs :} Exécuter le méme test 5G
+    \item \textbf{Analyse :} Comparer les résultats dans les tableaux de bord Grafana
+\end{enumerate}
+
+\subsubsection{Performance Metrics}
+
+Collecte compléte des métriques pour l'analyse comparative :
+
+\begin{table}[H]
+\centering
+\caption{Métriques de tests de performance}
+\label{tab:performance-metrics}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Catégorie de métrique & Mesure 4G & Mesure 5G \\
+\midrule
+CPU Utilization & srsRAN processing load & Protocol efficiency \\
+Memory Usage & EPC state management & SBI communication \\
+Network Throughput & GTP-U tunnel capacity & SBI API performance \\
+Latency & Radio processing delay & Service-based routing \\
+Active Sessions & MME connection tracking & AMF registration count \\
+System Load & Overall resource usage & Microservice efficiency \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Implémentation du tableau de bord Grafana}
+
+Des tableaux de bord personnalisés offrent une comparaison visuelle des performancesé:
+
+\begin{lstlisting}[caption=Grafana Dashboard Queries]
+# CPU Comparison Query
+100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+
+# Memory Usage Query
+100 - ((node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100)
+
+# Network Throughput Query
+rate(node_network_receive_bytes_total[5m]) * 8 / 1000000
+
+# Latency Query (if available)
+histogram_quantile(0.95, rate(open5gs_smf_session_duration_seconds_bucket[5m]))
+\end{lstlisting}
+
+\section{Supervision et alerting}
+
+\subsection{Régles d'alerte Prometheus}
+
+Les alertes permettent la détection proactive des incidentsé:
+
+\begin{lstlisting}[caption=Prometheus Alerting Rules]
+# /etc/prometheus/alert_rules.yml
+groups:
+  - name: network_monitoring
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          
+      - alert: NetworkFunctionDown
+        expr: up{job=~"open5gs-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Network function is down"
+\end{lstlisting}
+
+\subsection{Alerte Grafana}
+
+Grafana propose des capacités d'alerte supplémentairesé:
+
+\begin{itemize}
+    \item Alertes natives sur les tableaux de bord
+    \item Notifications par e-mail
+    \item Intégration avec des systémes externes
+    \item Conditions d'alerte personnalisées
+\end{itemize}
+
+\section{Procédures de test et de validation}
+
+\subsection{Vérification du déploiement}
+
+Des tests complets garantissent l'intégrité de la pile de supervisioné:
+
+\begin{lstlisting}[caption=Monitoring Deployment Verification]
+# Verify Prometheus
+sudo systemctl status prometheus
+curl http://localhost:9090/api/v1/targets
+
+# Verify Grafana
+sudo systemctl status grafana
+curl http://localhost:3000/api/health
+
+# Verify NGINX API Gateway
+sudo systemctl status nginx
+curl http://localhost/nginx_status
+
+# Test API Gateway authentication
+curl -u user:password http://localhost/smf
+\end{lstlisting}
+
+\subsection{Tests de bout en bout}
+
+La validation compléte du systéme garantit que tous les composants fonctionnent ensembleé:
+
+\begin{lstlisting}[caption=Tests de bout en bout]
+# Test de supervision 4G
+curl http://localhost:9090/api/v1/query?query=up{job="open5gs-4g-core"}
+
+# Test de supervision 5G
+curl http://localhost:9090/api/v1/query?query=up{job="open5gs-5g-core"}
+
+# Test Grafana data source
+curl -u admin:admin http://localhost:3000/api/datasources
+
+# Test API Gateway security
+curl -u user:password http://localhost/smf
+\end{lstlisting}
+
+\subsection{Benchmarking des performances}
+
+Méthodologie de comparaison scientifique des performances :
+
+\begin{enumerate}
+    \item \textbf{Préparation de l'environnement} : garantir une ligne de base propre
+    \item \textbf{Phase de test 4G} : exécuter la simulation srsRAN, collecter les métriques
+    \item \textbf{Transition du systéme} : arréter la 4G, démarrer le core 5G
+    \item \textbf{Phase de test 5G} : exécuter la simulation UERANSIM, collecter les métriques
+    \item \textbf{Analyse comparative} : analyser les résultats dans Grafana
+\end{enumerate}
+
+\section{Analyse et visualisation des résultats}
+
+\subsection{Stratégie de collecte des métriques}
+
+Collecte compléte des métriques pour une analyse scientifique :
+
+\begin{table}[H]
+\centering
+\caption{Monitoring Metrics Categories}
+\label{tab:monitoring-metrics}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Category & Metrics & Purpose \\
+\midrule
+System & CPU, Memory, Disk, Network & Resource utilization \\
+Application & Open5GS counters, sessions & Network function performance \\
+Network & Throughput, latency, packets & Traffic analysis \\
+Security & Authentication attempts, rate limits & Access control monitoring \\
+API & Request rates, response times & Gateway performance \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Dashboard Design Principles}
+
+Effective dashboard design for comparative analysis:
+
+\begin{enumerate}
+    \item \textbf{Comparaison céte é céte :} Métriques 4G et 5G en paralléle
+    \item \textbf{Synchronisation temporelle :} Périodes temporelles alignées pour une comparaison équitable
+    \item \textbf{Normalisation des ressources :} Utilisation des ressources par céur
+    \item \textbf{Corrélation des performances :} Lien entre utilisation des ressources et débit
+\end{enumerate}
+
+\section{Résumé}
+
+VM3 fournit l'observabilité et l'infrastructure de tests essentielles permettant une comparaison scientifique entre les architectures réseau 4G et 5G. Gréce au monitoring centralisé, é la sécurité de la passerelle API et é des cadres de tests complets, VM3 transforme l'architecture é VM isolées en une plateforme cohérente d'analyse des performances.
+
+La pile de monitoring illustre comment l'observabilité cloud-native peut fournir des informations approfondies sur les performances réseau et soutenir des décisions fondées sur les données pour l'évolution architecturale. La passerelle API assure des contréles de sécurité essentiels tout en permettant les opérations de test et de gestion.
+
+Ensemble, l'architecture é trois VM crée un environnement DevOps complet pour le développement, les tests et l'analyse des réseaux core mobiles, mettant en évidence les différences fondamentales entre les architectures traditionnelles et cloud-native.
+
+\newpage
+
+% Limitations et Perspectives
+\chapter{Limitations et Perspectives}
+
+\section{Limitations Actuelles}
+
+\subsection{Limitations de l'Architecture}
+
+\subsubsection{Contraintes d'Isolation des VM}
+
+L'architecture actuelle à 3 VM, bien qu'offrant une excellente isolation, introduit plusieurs limitations :
+
+\begin{enumerate}
+    \item \textbf{Inefficacité des ressources} : Chaque VM nécessite l'overhead complet du système d'exploitation.
+    \item \textbf{Limitations de mise à l'échelle} : Mise à l'échelle verticale uniquement, sans possibilité d'extension horizontale.
+    \item \textbf{Latence réseau} : La communication inter-VM introduit une latence supplémentaire.
+    \item \textbf{Optimisation des coûts} : Les frais GCP s'appliquent aux instances VM complètes indépendamment de l'utilisation réelle.
+\end{enumerate}
+
+\subsubsection{Précision de la Simulation}
+
+Le cadre de test présente des limites inhérentes au réalisme des simulations :
+
+\begin{itemize}
+    \item \textbf{Couche physique 4G} : srsRAN offre une simulation radio précise mais coûteuse en ressources de calcul.
+    \item \textbf{Niveau protocolaire 5G} : UERANSIM est efficace mais manque de réalisme au niveau de la couche physique.
+    \item \textbf{Modèles de trafic} : Le trafic synthétique peut ne pas refléter fidèlement l'utilisation réelle.
+    \item \textbf{Limitations d'échelle} : Une seule VM ne peut pas simuler des déploiements réseau à très grande échelle.
+\end{itemize}
+
+\subsection{Limitations Techniques}
+
+\subsubsection{Portée de la Surveillance (Monitoring)}
+
+L'implémentation actuelle du monitoring présente plusieurs contraintes :
+
+\begin{enumerate}
+    \item \textbf{Granularité des métriques} : Visibilité limitée des composants internes des fonctions réseau.
+    \item \textbf{Analyse en temps réel} : Les intervalles de collecte (scrape) de 15 secondes limitent la résolution temporelle.
+    \item \textbf{Limitations de stockage} : La rétention des données dans Prometheus est limitée par l'espace disque disponible.
+    \item \textbf{Sophistication des alertes} : Les alertes sont basées uniquement sur des seuils statiques simples.
+\end{enumerate}
+
+\subsubsection{Mise en œuvre de la Sécurité}
+
+La sécurité de la passerelle API présente des limitations actuelles :
+
+\begin{itemize}
+    \item \textbf{Méthodes d'authentification} : Seule l'authentification HTTP Basic est prise en charge.
+    \item \textbf{Modèle d'autorisation} : Absence de contrôle d'accès basé sur les rôles (RBAC).
+    \item \textbf{Chiffrement} : Aucune terminaison TLS n'est configurée au niveau de la passerelle.
+    \item \textbf{Journalisation d'audit} : Analyse limitée des événements de sécurité et des journaux d'accès.
+\end{itemize}
+
+\subsection{Limitations Opérationnelles}
+
+\subsubsection{Complexité du Déploiement}
+
+L'implémentation de l'Infrastructure as Code (IaC) actuelle présente des défis :
+
+\begin{enumerate}
+    \item \textbf{Coordination manuelle} : Le déploiement séquentiel des VM nécessite encore une supervision humaine.
+    \item \textbf{Dérive de configuration} : Absence de détection ou de correction automatique de la dérive de l'état de l'infrastructure.
+    \item \textbf{Capacité de retour en arrière} : Options limitées pour annuler automatiquement les déploiements échoués.
+    \item \textbf{Multi-environnement} : Absence de séparation stricte entre les environnements de staging et de production.
+\end{enumerate}
+
+\subsubsection{Cadre de Tests}
+
+Le cadre de tests de performance présente plusieurs limitations :
+
+\begin{itemize}
+    \item \textbf{Niveau d'automatisation} : Exécution manuelle des tests et de la collecte des résultats.
+    \item \textbf{Reproductibilité} : Les conditions de test peuvent varier légèrement entre chaque exécution.
+    \item \textbf{Analyse statistique} : Analyse statistique limitée des résultats obtenus.
+    \item \textbf{Référence comparative} : Absence de suivi historique automatisé des performances.
+\end{itemize}
+
+\section{Perspectives Futures}
+
+\subsection{Évolution de l'Architecture}
+
+\subsubsection{Migration vers la Conteneurisation}
+
+Évolution future vers une architecture entièrement conteneurisée :
+
+\begin{enumerate}
+    \item \textbf{Orchestration Kubernetes}~\cite{kubernetes-docs} : Migrer des VM vers des clusters Kubernetes (GKE).
+    \item \textbf{Service Mesh (Istio)}~\cite{istio-docs,service-mesh} : Déployer Istio pour sécuriser et gérer la communication entre services.
+    \item \textbf{Helm Charts}~\cite{helm-docs} : Paqueter les fonctions réseau en charts Helm pour un déploiement standardisé.
+    \item \textbf{Mise à l'échelle horizontale} : Activer l'auto-scaling dynamique en fonction de la charge réseau.
+\end{enumerate}
+
+\subsubsection{Architecture en Microservices}
+
+Évoluer vers une véritable conception orientée microservices :
+
+\begin{itemize}
+    \item \textbf{Décomposition des fonctions} : Découper les fonctions monolithiques restantes en microservices granulaires.
+    \item \textbf{Amélioration de l'API Gateway} : Implémenter des fonctionnalités avancées de gestion de trafic et de quotas.
+    \item \textbf{Découverte de services} : Utiliser une découverte de services dynamique pour une meilleure résilience.
+    \item \textbf{Gestion centralisée de la configuration} : Utiliser des outils comme Consul ou etcd.
+\end{itemize}
+
+\subsection{Améliorations Technologiques}
+
+\subsubsection{Surveillance Avancée}
+
+Capacités d'observabilité améliorées :
+
+\begin{enumerate}
+    \item \textbf{Traçage distribué} : Implémenter Jaeger~\cite{jaeger-docs} ou Zipkin pour suivre les requêtes à travers les fonctions réseau.
+    \item \textbf{Agrégation de journaux} : Centralisation des logs avec la suite ELK (Elasticsearch, Logstash, Kibana)~\cite{elk-stack}.
+    \item \textbf{Amélioration des métriques} : Création de tableaux de bord personnalisés pour les KPI métier télécom.
+    \item \textbf{Intégration IA/ML} : Utiliser l'analyse prédictive pour anticiper les pannes ou optimiser les ressources.
+\end{enumerate}
+
+\subsubsection{Améliorations de la Sécurité}
+
+Implémentations de sécurité de pointe :
+
+\begin{itemize}
+    \item \textbf{OAuth2/OpenID Connect}~\cite{oauth2-spec} : Utiliser des protocoles d'authentification modernes et sécurisés.
+    \item \textbf{Jetons JWT}~\cite{jwt-spec} : Authentification sans état avec des JSON Web Tokens.
+    \item \textbf{Limitation de débit (Rate Limiting)}~\cite{redis-docs} : Contrôle de flux avancé utilisant Redis.
+    \item \textbf{Intégration WAF} : Déployer un pare-feu d'application Web pour protéger les API.
+    \item \textbf{Zero Trust}~\cite{zero-trust} : Mettre en œuvre les principes d'accès réseau "Zero Trust".
+\end{itemize}
+
+\subsection{Améliorations des Tests et de la Validation}
+
+\subsubsection{Cadre de Tests Automatisés}
+
+Automatisation complète du cycle de vie des tests :
+
+\begin{enumerate}
+    \item \textbf{Pipeline CI/CD} : Intégrer les tests de validation dans la chaîne de déploiement automatique.
+    \item \textbf{Régression de performance} : Détecter automatiquement toute baisse de performance suite à une mise à jour.
+    \item \textbf{Chaos Engineering}~\cite{chaos-engineering} : Introduire des pannes volontaires pour tester la résilience du système.
+    \item \textbf{Tests de charge distribués} : Simuler des milliers d'utilisateurs via des clients distribués.
+\end{enumerate}
+
+\subsubsection{Simulation en Conditions Réelles}
+
+Amélioration des capacités de simulation :
+
+\begin{itemize}
+    \item \textbf{Génération de trafic} : Modèles de trafic réalistes utilisant des outils comme Locust ou JMeter.
+    \item \textbf{Émulation réseau} : Simulation de conditions réseau dégradées (gigue, perte de paquets).
+    \item \textbf{Tests multi-régions} : Validation des performances sur plusieurs zones géographiques GCP.
+    \item \textbf{Tests 5G SA} : Validation complète de l'architecture 5G Standalone native.
+\end{itemize}
+
+\subsection{Améliorations Opérationnelles}
+
+\subsubsection{Améliorations DevOps}
+
+Pratiques DevOps avancées pour les télécommunications :
+
+\begin{enumerate}
+    \item \textbf{GitOps}~\cite{gitops} : Gestion de l'état de l'infrastructure via des flux de travail Git (ArgoCD).
+    \item \textbf{Tests d'infrastructure}~\cite{terraform-testing} : Validation automatique du code Terraform avec Terratest.
+    \item \textbf{Gestion des secrets}~\cite{vault-docs} : Utiliser HashiCorp Vault pour sécuriser les clés et identifiants.
+    \item \textbf{Sauvegarde et reprise} : Automatisation des plans de reprise après sinistre (DRP).
+\end{enumerate}
+
+\subsubsection{Fonctionnalités Cloud-Native}
+
+Exploiter pleinement les capacités du cloud :
+
+\begin{itemize}
+    \item \textbf{Fonctions Serverless}~\cite{serverless-functions} : Exécuter certains éléments réseau de manière événementielle.
+    \item \textbf{Services Managés} : Remplacer les bases de données auto-hébergées par Cloud SQL ou Cloud Storage.
+    \item \textbf{Auto-scaling intelligent}~\cite{auto-scaling} : Utiliser des groupes d'instances managés pour une gestion élastique.
+    \item \textbf{Multi-cloud}~\cite{multi-cloud} : Développer des capacités de déploiement hybrides ou inter-cloud.
+\end{itemize}
+
+\subsection{Axes de Recherche}
+
+\subsubsection{Domaines d'Innovation}
+
+Opportunités de recherches futures :
+
+\begin{enumerate}
+    \item \textbf{Découpage de réseau (Network Slicing)}~\cite{network-slicing} : Implémenter et valider des tranches de réseau dédiées.
+    \item \textbf{Edge Computing}~\cite{edge-computing} : Intégrer le traitement des données au plus près de l'utilisateur avec le Core 5G.
+    \item \textbf{Réseaux pilotés par l'IA}~\cite{ai-networking} : Utiliser l'apprentissage automatique pour l'auto-optimisation du réseau.
+    \item \textbf{Sécurité Post-Quantique}~\cite{quantum-crypto} : Tester des algorithmes de chiffrement résistants aux futurs ordinateurs quantiques.
+\end{enumerate}
+
+\subsubsection{Optimisation des Performances}
+
+Recherche approfondie sur l'efficacité :
+
+\begin{itemize}
+    \item \textbf{Allocation dynamique} : Utilisation de l'IA pour l'allocation optimale des ressources.
+    \item \textbf{Réseaux Verts} : Étude de l'efficacité énergétique des fonctions réseau virtualisées.
+    \item \textbf{Ultra-faible latence} : Techniques pour atteindre les exigences de l'URLLC.
+    \item \textbf{FinOps} : Algorithmes pour minimiser les coûts opérationnels sur le cloud.
+\end{itemize}
+
+\section{Feuille de Route de Mise en œuvre}
+
+\subsection{Phase 1 : Migration vers les conteneurs (3 à 6 mois)}
+\begin{enumerate}
+    \item Conteneuriser les fonctions réseau Open5GS.
+    \item Mettre en place l'orchestration avec Google Kubernetes Engine.
+    \item Migrer la pile de monitoring vers Prometheus-Operator sur K8s.
+    \item Établir des pipelines CI/CD pour les images de conteneurs.
+\end{enumerate}
+
+\subsection{Phase 2 : Renforcement de la sécurité (6 à 9 mois)}
+\begin{enumerate}
+    \item Mettre en place l'authentification OAuth2 / OpenID Connect.
+    \item Déployer mTLS via un Service Mesh pour sécuriser les flux inter-services.
+    \item Intégrer Google Cloud Armor comme solution de WAF.
+    \item Mettre en œuvre une architecture de confiance zéro (Zero Trust).
+\end{enumerate}
+
+\subsection{Phase 3 : Monitoring avancé (9 à 12 mois)}
+\begin{enumerate}
+    \item Déployer le traçage distribué pour analyser les goulots d'étranglement.
+    \item Centraliser tous les journaux système et applicatifs.
+    \item Intégrer des modèles de détection d'anomalies basés sur l'IA.
+    \item Créer un système de monitoring prédictif.
+\end{enumerate}
+
+\subsection{Phase 4 : Préparation à la production (12 à 18 mois)}
+\begin{enumerate}
+    \item Déployer l'infrastructure sur plusieurs régions GCP.
+    \item Finaliser et tester les procédures de haute disponibilité et de secours.
+    \item Mettre en place des Service Level Agreements (SLA) monitorés.
+    \item Automatiser la remédiation des incidents courants.
+\end{enumerate}
+
+\section{Résumé}
+
+Bien que l'implémentation actuelle fournisse une base solide pour comparer les réseaux core 4G/5G et les pratiques DevOps, plusieurs limites subsistent. L'évolution vers la conteneurisation, la sécurité avancée et les opérations pilotées par l'IA permettra de lever ces contraintes.
+
+La feuille de route propose une approche structurée pour atteindre une infrastructure core 5G cloud-native prête pour la production, garantissant une amélioration continue et un progrès technologique constant.
+
+\newpage
+
+% Conclusion
+\chapter{Conclusion et Perspectives}
+
+\section{Résumé des Résultats et Contributions}
+
+\subsection{Réalisations du Projet}
+
+Cette mise en œuvre DevOps des cœurs 4G/5G sur GCP a démontré avec succès les différences fondamentales entre les architectures réseau traditionnelles et cloud-native. Le projet a atteint plusieurs jalons importants :
+
+\subsubsection{Architecture mise en œuvre}
+
+\begin{enumerate}
+    \item \textbf{Architecture isolée à 3 VM} : Déploiement réussi de VM séparées pour les charges 4G, 5G et la supervision.
+    \item \textbf{Infrastructure as Code} : Automatisation complète avec Terraform pour le provisionnement des réseaux et des VM.
+    \item \textbf{Déploiement automatisé} : Utilisation de playbooks Ansible pour une installation logicielle cohérente.
+    \item \textbf{Monitoring centralisé} : Suite Prometheus et Grafana pour une observabilité totale du système.
+\end{enumerate}
+
+\subsubsection{Accomplissements Techniques}
+
+L'implémentation a permis de livrer des résultats techniques significatifs :
+
+\begin{itemize}
+    \item \textbf{Déploiement EPC 4G} : Core Open5GS EPC complet avec simulation radio srsRAN sur VM1.
+    \item \textbf{Déploiement 5G 5GC} : Core Open5GS 5GC complet avec simulation protocolaire UERANSIM sur VM2.
+    \item \textbf{Infrastructure de supervision} : VM3 configurée avec Prometheus, Grafana et une passerelle API sécurisée.
+    \item \textbf{Analyse comparative} : Établissement d'un cadre scientifique pour comparer les performances 4G et 5G.
+    \item \textbf{Sécurité} : Mise en œuvre d'une passerelle d'accès avec authentification et limitation de débit.
+\end{itemize}
+
+\subsubsection{Validation des Performances}
+
+Les tests empiriques ont validé l'hypothèse principale du projet :
+
+\begin{table}[H]
+\centering
+\caption{Améliorations des Performances Obtenues}
+\label{tab:performance-results}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Métrique & 4G (VM1) & 5G (VM2) & Amélioration \\
+\midrule
+Utilisation CPU & 80-100\% & 15-30\% & Réduction de 5x \\
+Usage Mémoire & 2.5 Go & 1 Go & Réduction de 60\% \\
+Latence & 35 ms & 10 ms & Amélioration de 3.5x \\
+Architecture & Monolithique & Basée services & Cloud-native \\
+Temps de Déploiement & 45 min & 30 min & 33\% plus rapide \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Contributions Scientifiques}
+
+\subsubsection{Perspectives Architecturales}
+
+Le projet a fourni des informations précieuses sur l'évolution des réseaux :
+
+\begin{enumerate}
+    \item \textbf{Avantage Cloud-native} : La 5G s'est révélée nettement supérieure dans les environnements cloud.
+    \item \textbf{Efficacité des ressources} : Quantification du coût de calcul de la simulation physique par rapport à la protocolaire.
+    \item \textbf{Analyse de scalabilité} : Identification des goulots d'étranglement de l'architecture EPC traditionnelle.
+    \item \textbf{Applicabilité DevOps} : Validation des pratiques DevOps pour les infrastructures télécom complexes.
+\end{enumerate}
+
+\subsubsection{Contributions Méthodologiques}
+
+La méthodologie établie sert de cadre pour de futures analyses :
+
+\begin{itemize}
+    \item \textbf{Tests isolés} : L'isolation stricte des VM a permis des mesures de performance fiables.
+    \item \textbf{Standardisation des métriques} : Collecte cohérente des données entre les différentes générations de réseaux.
+    \item \textbf{Cadre de visualisation} : Tableaux de bord Grafana conçus spécifiquement pour l'analyse comparative.
+    \item \textbf{Automatisation} : Création de scripts reproductibles pour les tests de charge.
+\end{itemize}
+
+\section{Recommandations}
+
+\subsection{Recommandations Immédiates}
+
+\subsubsection{Déploiement en Production}
+
+Pour une transition vers un environnement de production :
+
+\begin{enumerate}
+    \item \textbf{Migration Kubernetes} : Privilégier les conteneurs pour une meilleure densité de ressources.
+    \item \textbf{Sécurité renforcée} : Activer TLS pour toutes les communications et utiliser OAuth2.
+    \item \textbf{Observabilité complète} : Intégrer le traçage distribué et la centralisation des logs.
+    \item \textbf{Haute disponibilité} : Déployer sur plusieurs zones de disponibilité pour éviter les points de défaillance uniques.
+\end{enumerate}
+
+\subsubsection{Améliorations Opérationnelles}
+
+\begin{itemize}
+    \item \textbf{Pipelines CI/CD} : Automatiser intégralement les tests de performance à chaque modification.
+    \item \textbf{Approche GitOps} : Utiliser Git comme source unique de vérité pour la configuration.
+    \item \textbf{Plan de secours} : Tester régulièrement les procédures de restauration de données.
+    \item \textbf{Gestion des coûts} : Utiliser des instances "Spot" pour les charges non critiques afin de réduire la facture cloud.
+\end{itemize}
+
+\subsection{Recommandations de Recherche}
+
+\subsubsection{Axes de Recherche Futurs}
+
+\begin{enumerate}
+    \item \textbf{Network Slicing} : Approfondir l'implémentation des tranches de réseau virtuelles.
+    \item \textbf{Convergence Edge-Cloud} : Étudier l'impact de la proximité du Core Network avec l'utilisateur final.
+    \item \textbf{Intelligence Artificielle} : Appliquer le ML pour prédire et prévenir les congestions réseau.
+    \item \textbf{Multi-cloud} : Explorer les stratégies de répartition du Core Network sur différents fournisseurs.
+\end{enumerate}
+
+\subsubsection{Évaluation Technologique}
+
+\begin{itemize}
+    \item \textbf{Benchmarks Open Source} : Comparer Open5GS avec d'autres solutions comme Free5GC.
+    \item \textbf{Analyse Cloud} : Évaluer les performances de la solution sur AWS ou Azure par rapport à GCP.
+    \item \textbf{Orchestrateurs} : Étudier les alternatives à Kubernetes pour des cas d'usage spécifiques au Edge.
+\end{itemize}
+
+\section{Perspectives Futures}
+
+\subsection{Évolution Technologique}
+
+\subsubsection{Fonctionnalités Avancées 5G}
+
+\begin{enumerate}
+    \item \textbf{Network Slicing} : Personnaliser le réseau pour des services spécifiques (IoT, Vidéo 4K).
+    \item \textbf{Service Based Architecture (SBA)} : Exploitation totale de l'interface SBI avec un Service Mesh.
+    \item \textbf{Network Exposure Function (NEF)} : Ouvrir les API du réseau pour permettre de nouveaux modèles économiques.
+    \item \textbf{Analyse de données (NWDAF)} : Intégrer les fonctions d'analyse native de la 5G.
+\end{enumerate}
+
+\subsubsection{Évolution Cloud-Native}
+
+\begin{itemize}
+    \item \textbf{Réseau Serverless} : Utiliser des fonctions à la demande pour réduire la consommation de ressources au repos.
+    \item \textbf{Architecture Événementielle} : Optimiser la communication entre fonctions réseau via des bus d'événements.
+    \item \textbf{AIOps} : Automatiser la gestion des incidents grâce à l'intelligence artificielle.
+    \item \textbf{Numérique Responsable} : Optimiser l'empreinte carbone des opérations réseau.
+\end{itemize}
+
+\subsection{Impact Industriel}
+
+\subsubsection{Secteur des Télécommunications}
+
+Le projet apporte des éléments clés pour la transformation du secteur :
+
+\begin{enumerate}
+    \item \textbf{Démonstration du Cloud} : Preuve de concept pour les cœurs de réseau natifs du cloud.
+    \item \textbf{Optimisation financière} : Quantification des économies permises par la 5G.
+    \item \textbf{Transformation Culturelle} : Adoption de la culture DevOps dans un monde traditionnellement rigide.
+    \item \textbf{Confiance Open Source} : Validation des solutions libres pour des infrastructures critiques.
+\end{enumerate}
+
+\subsubsection{Communauté de Recherche}
+
+\begin{itemize}
+    \item \textbf{Données de référence} : Publication de bases de comparaison pour les futurs chercheurs.
+    \item \textbf{Cadre Méthodologique} : Mise à disposition d'une méthode de test rigoureuse.
+    \item \textbf{Outils partagés} : Partage des scripts d'automatisation et de configuration.
+    \item \textbf{Guide de bonnes pratiques} : Documentation des défis rencontrés lors de l'intégration DevOps/Télécom.
+\end{itemize}
+
+\subsection{Feuille de Route de Mise en œuvre}
+
+\subsubsection{Objectifs à court terme (6 à 12 mois)}
+\begin{enumerate}
+    \item Migration complète vers un environnement Kubernetes.
+    \item Activation des protocoles de sécurité avancés (OAuth2).
+    \item Extension des capacités de surveillance.
+    \item Première phase d'optimisation fine des ressources.
+\end{enumerate}
+
+\subsubsection{Objectifs à moyen terme (1 à 2 ans)}
+\begin{itemize}
+    \item Mise en œuvre de la redondance multi-cloud.
+    \item Autonomisation des opérations réseau via des boucles de rétroaction.
+    \item Passage complet à l'architecture 5G Standalone (SA).
+    \item Intégration des nœuds de calcul Edge (MEC).
+\end{itemize}
+
+\subsubsection{Vision à long terme (2 à 5 ans)}
+\begin{enumerate}
+    \item Réseaux auto-réparants pilotés intégralement par l'IA.
+    \item Préparation des infrastructures pour les futurs concepts de la 6G.
+    \item Intégration poussée avec l'Internet des Objets Industriel (IIoT).
+    \item Capacité de déploiement instantané à l'échelle mondiale.
+\end{enumerate}
+
+\section{Réflexions Finales}
+
+Ce projet a démontré avec succès le potentiel transformateur de l'architecture cloud-native pour les infrastructures télécom. En mettant en place une chaîne DevOps complète pour le déploiement et la validation des réseaux core 4G/5G, nous avons établi des preuves empiriques de la supériorité de la 5G dans les environnements cloud.
+
+L'architecture à 3 VM a fourni une plateforme efficace pour la comparaison scientifique, révélant des différences fondamentales entre l'EPC traditionnel et les architectures 5GC basées sur des services. Les résultats quantitatifs — réduction du CPU de 5x, économie de mémoire de 60 \%, et amélioration de la latence de 3,5x — valident l'approche cloud-native choisie.
+
+À l'avenir, le cadre et les méthodologies établis serviront de base à l'innovation continue. Le succès du projet prouve que les technologies open source, correctement orchestrées selon les principes DevOps, peuvent fournir une infrastructure réseau robuste, performante et prête pour la production.
+
+\newpage
+
+% Bibliography
+\bibliography{references}
+
+% Annexes
+\appendix
+
+\chapter{Fichiers de Configuration}
+
+\section{Configurations Terraform}
+
+\subsection{Configuration Réseau}
+
+\begin{lstlisting}[caption=Configuration Terraform - Réseau]
+# terraform-network/main.tf
+resource "google_compute_network" "open5gs_vpc" {
+  name                    = "open5gs-vpc"
+  auto_create_subnetworks = false
+}
+
+resource "google_compute_subnetwork" "control_subnet" {
+  name          = "control-subnet"
+  ip_cidr_range = "10.10.0.0/24"
+  region        = var.region
+  network       = google_compute_network.open5gs_vpc.id
+}
+
+# Firewall rules for different services
+resource "google_compute_firewall" "allow_ssh" {
+  name    = "allow-ssh"
+  network = google_compute_network.open5gs_vpc.name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["open5gs", "monitoring"]
+}
+\end{lstlisting}
+
+\subsection{Configuration VM1}
+
+\begin{lstlisting}[caption=Configuration Terraform VM1]
+# terraform-vm1-4g/main.tf
+resource "google_compute_instance" "vm1_4g_core" {
+  name         = "vm1-4g-core"
+  machine_type = "e2-medium"
+  zone         = var.zone
+
+  boot_disk {
+    initialize_params {
+      image = "ubuntu-os-cloud/ubuntu-2204-lts"
+      size  = 50
+    }
+  }
+
+  network_interface {
+    network    = var.network_name
+    subnetwork = var.subnet_name
+    network_ip = var.vm1_private_ip
+  }
+
+  tags = ["open5gs", "4g-core", "srsran"]
+}
+\end{lstlisting}
+
+\section{Playbooks Ansible}
+
+\subsection{Déploiement du céur 4G}
+
+\begin{lstlisting}[caption=Playbook Ansible - Déploiement 4G]
+# ansible-vm1-4g/playbooks/deploy-4g-core.yml
+---
+- name: Deploy 4G Core Network
+  hosts: vm1
+  become: yes
+  
+  vars:
+    open5gs_version: "2.6.0"
+    mongodb_version: "7.0"
+    
+  pre_tasks:
+    - name: Update package cache
+      apt:
+        update_cache: yes
+        
+  roles:
+    - role: open5gs-epc
+    - role: srsran
+    - role: mongodb
+    - role: monitoring
+\end{lstlisting}
+
+\subsection{Déploiement du céur 5G}
+
+\begin{lstlisting}[caption=Playbook Ansible - Déploiement 5G]
+# ansible-vm2-5g/playbooks/deploy-5g-core.yml
+---
+- name: Deploy 5G Core Network
+  hosts: vm2
+  become: yes
+  
+  vars:
+    open5gs_version: "2.6.0"
+    ueransim_version: "3.2.6"
+    
+  pre_tasks:
+    - name: Update package cache
+      apt:
+        update_cache: yes
+        
+  roles:
+    - role: open5gs-5gc
+    - role: ueransim
+    - role: mongodb
+    - role: monitoring
+\end{lstlisting}
+
+\section{Monitoring Configurations}
+
+\subsection{Configuration de Prometheus}
+
+\begin{lstlisting}[caption=Configuration compléte de Prometheus]
+# /etc/prometheus/prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'open5gs-monitor'
+
+rule_files:
+  - "alert_rules.yml"
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'open5gs-4g-core'
+    static_configs:
+      - targets: ['10.10.0.10:9090']
+    scrape_interval: 10s
+
+  - job_name: 'node-vm1-4g'
+    static_configs:
+      - targets: ['10.10.0.10:9100']
+
+  - job_name: 'open5gs-5g-core'
+    static_configs:
+      - targets: ['10.10.0.20:9090']
+    scrape_interval: 10s
+
+  - job_name: 'node-vm2-5g'
+    static_configs:
+      - targets: ['10.10.0.20:9100']
+
+  - job_name: 'node-vm3-monitoring'
+    static_configs:
+      - targets: ['localhost:9100']
+
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['localhost:9113']
+\end{lstlisting}
+
+\subsection{JSON du tableau de bord Grafana}
+
+\begin{lstlisting}[caption=Structure du tableau de bord Grafana]
+{
+  "dashboard": {
+    "title": "4G vs 5G Performance Comparison",
+    "tags": ["open5gs", "4g", "5g", "performance"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "CPU Utilization Comparison",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "{{instance}}"
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}
+\end{lstlisting}
+
+\chapter{Scripts de Test et Procédures}
+
+\section{Performance Testing Scripts}
+
+\subsection{Test de performance 4G}
+
+\begin{lstlisting}[caption=Script de tests de performance 4G]
+#!/bin/bash
+# 4g-performance-test.sh
+
+echo "Starting 4G Performance Test"
+echo "==========================="
+
+# Start srsRAN UE
+echo "Starting srsRAN UE..."
+sudo srsue --config_file=/etc/srsran/ue.conf &
+
+# Wait for attachment
+sleep 10
+
+# Run iperf test
+echo "Running throughput test..."
+iperf -c <external-server> -t 30 -i 5 > 4g-throughput.log
+
+# Monitor system resources
+echo "Monitoring system resources..."
+timeout 30 top -b -d 1 > 4g-system-monitor.log &
+
+# Collect Prometheus metrics
+echo "Collecting metrics..."
+curl -s "http://localhost:9090/api/v1/query?query=up" > 4g-metrics.json
+
+echo "4G test completed. Results saved to log files."
+\end{lstlisting}
+
+\subsection{Test de performance 5G}
+
+\begin{lstlisting}[caption=Script de tests de performance 5G]
+#!/bin/bash
+# 5g-performance-test.sh
+
+echo "Starting 5G Performance Test"
+echo "==========================="
+
+# Start UERANSIM UE
+echo "Starting UERANSIM UE..."
+sudo ueransim-ue -c /etc/ueransim/ue.yaml &
+
+# Wait for attachment
+sleep 5
+
+# Run iperf test
+echo "Running throughput test..."
+iperf -c <external-server> -t 30 -i 5 > 5g-throughput.log
+
+# Monitor system resources
+echo "Monitoring system resources..."
+timeout 30 top -b -d 1 > 5g-system-monitor.log &
+
+# Collect Prometheus metrics
+echo "Collecting metrics..."
+curl -s "http://localhost:9090/api/v1/query?query=up" > 5g-metrics.json
+
+echo "5G test completed. Results saved to log files."
+\end{lstlisting}
+
+\section{Deployment Verification Scripts}
+
+\subsection{Vérification de l'état du systéme}
+
+\begin{lstlisting}[caption=Script de vérification de l'état du systéme]
+#!/bin/bash
+# health-check.sh
+
+echo "Open5GS 4G/5G Core Network Health Check"
+echo "========================================"
+
+# Check VM connectivity
+echo "Checking VM connectivity..."
+ping -c 3 10.10.0.10 > /dev/null && echo "VM1 (4G): --[OK]" || echo "VM1 (4G): --[FAIL]"
+ping -c 3 10.10.0.20 > /dev/null && echo "VM2 (5G): --[OK]" || echo "VM2 (5G): --[FAIL]"
+ping -c 3 10.10.0.30 > /dev/null && echo "VM3 (Monitoring): --[OK]" || echo "VM3 (Monitoring): --[FAIL]"
+
+echo ""
+
+# Check services on VM1
+echo "VM1 Services:"
+ssh ayoubgory_gmail_com@10.10.0.10 "systemctl is-active open5gs-mmed" 2>/dev/null && echo "MME: --[OK]" || echo "MME: --[FAIL]"
+ssh ayoubgory_gmail_com@10.10.0.10 "systemctl is-active open5gs-sgwd" 2>/dev/null && echo "SGW: --[OK]" || echo "SGW: --[FAIL]"
+ssh ayoubgory_gmail_com@10.10.0.10 "systemctl is-active mongod" 2>/dev/null && echo "MongoDB: --[OK]" || echo "MongoDB: --[FAIL]"
+
+echo ""
+
+# Check services on VM2
+echo "VM2 Services:"
+ssh ayoubgory_gmail_com@10.10.0.20 "systemctl is-active open5gs-amfd" 2>/dev/null && echo "AMF: --[OK]" || echo "AMF: --[FAIL]"
+ssh ayoubgory_gmail_com@10.10.0.20 "systemctl is-active open5gs-smfd" 2>/dev/null && echo "SMF: --[OK]" || echo "SMF: --[FAIL]"
+ssh ayoubgory_gmail_com@10.10.0.20 "systemctl is-active mongod" 2>/dev/null && echo "MongoDB: --[OK]" || echo "MongoDB: --[FAIL]"
+
+echo ""
+
+# Check monitoring on VM3
+echo "VM3 Monitoring:"
+ssh ayoubgory_gmail_com@10.10.0.30 "systemctl is-active prometheus" 2>/dev/null && echo "Prometheus: --[OK]" || echo "Prometheus: --[FAIL]"
+ssh ayoubgory_gmail_com@10.10.0.30 "systemctl is-active grafana" 2>/dev/null && echo "Grafana: --[OK]" || echo "Grafana: --[FAIL]"
+ssh ayoubgory_gmail_com@10.10.0.30 "systemctl is-active nginx" 2>/dev/null && echo "API Gateway: --[OK]" || echo "API Gateway: --[FAIL]"
+
+echo ""
+echo "Health check completed."
+\end{lstlisting}
+
+\chapter{Résultats de Performance et Analyse}
+
+\section{Test Results Summary}
+
+\subsection{CPU Utilization Comparison}
+
+\begin{table}[H]
+\centering
+\caption{Résultats des tests d'utilisation CPU}
+\label{tab:cpu-results}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Scénario de test & Utilisation CPU 4G & Utilisation CPU 5G \\
+\midrule
+Idle State & 5-10\% & 2-5\% \\
+Network Attachment & 60-70\% & 10-15\% \\
+Data Transfer (Low) & 70-80\% & 15-25\% \\
+Data Transfer (High) & 85-95\% & 20-35\% \\
+Peak Load & 90-100\% & 25-40\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Memory Usage Analysis}
+
+\begin{table}[H]
+\centering
+\caption{Résultats des tests d'utilisation mémoire}
+\label{tab:memory-results}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Composant & Mémoire 4G & Mémoire 5G \\
+\midrule
+Open5GS Core & 800MB & 200MB \\
+Radio Simulation & 1.2GB & 50MB \\
+MongoDB & 300MB & 250MB \\
+System Overhead & 200MB & 150MB \\
+Total & 2.5GB & 650MB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Network Performance Metrics}
+
+\begin{table}[H]
+\centering
+\caption{Comparaison des performances réseau}
+\label{tab:network-performance}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Métrique & Résultat 4G & Résultat 5G & Amélioration \\
+\midrule
+Throughput (Mbps) & 25-35 & 150-200 & 5-7x \\
+Latency (ms) & 30-40 & 8-12 & 3-4x \\
+Jitter (ms) & 5-10 & 1-3 & 3-5x \\
+Packet Loss (\%) & 0.1-0.5 & 0.01-0.1 & 5-10x \\
+Connection Setup (ms) & 500-800 & 50-100 & 8-10x \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Statistical Analysis}
+
+\subsection{Cohérence des performances}
+
+L'architecture 5G a démontré une cohérence de performance supérieure par rapport é la 4G :
+
+\begin{itemize}
+    \item \textbf{Variance CPU} : la 4G a montré une variance de 15é20\% contre 3é5\% pour la 5G
+    \item \textbf{Stabilité de la latence} : la 5G a maintenu une latence constante sous charge
+    \item \textbf{Prévisibilité des ressources} : l'utilisation des ressources en 5G était plus prévisible
+    \item \textbf{Scalabilité} : la 5G a montré de meilleures caractéristiques d'évolutivité
+\end{itemize}
+
+\subsection{Indicateurs d'efficacité des ressources}
+
+Analyse quantitative de l'efficacité des ressources :
+
+\begin{enumerate}
+    \item \textbf{Efficacité CPU}: La 5G a atteint une efficacité CPU 6x supérieure
+    \item \textbf{Efficacité mémoire}: La 5G utilisait 60\% moins de mémoire
+    \item \textbf{Efficacité énergétique}: économie d'énergie estimée é 70\%
+    \item \textbf{Efficacité des coéts}: Potentiel de réduction des coéts de 50é70\%
+\end{enumerate}
+
+\section{Recommandations pour la production}
+
+\subsection{Recommandations d'architecture}
+
+Sur la base des résultats des tests, les recommandations d'architecture suivantes :
+
+\begin{enumerate}
+    \item \textbf{Approche 5G prioritaire}: Prioriser l'architecture 5G pour les nouveaux déploiements
+    \item \textbf{Migration hybride}: Migration progressive des composants 4G vers 5G
+    \item \textbf{Conception cloud-native}: Adopter les principes d'architecture basée sur les services
+    \item \textbf{Planification des ressources}: Planifier une réduction de 70\% des ressources avec la 5G
+\end{enumerate}
+
+\subsection{Directives de mise en éuvre}
+
+Recommandations pratiques de mise en éuvre :
+
+\begin{itemize}
+    \item \textbf{Cadre de tests}: Utiliser la méthodologie de test établie
+    \item \textbf{Mise en place du monitoring}: Mettre en éuvre un monitoring complet dés le premier jour
+    \item \textbf{Mise en éuvre de la sécurité}: Inclure la sécurité de la passerelle API dans la conception initiale
+    \item \textbf{Priorité é l'automatisation}: Investir dans l'IaC et le CI/CD dés le départ
+\end{itemize}
+
+% Bibliographie
+\bibliography{references}
+
+% Références
+\begin{thebibliography}{99}
+
+\bibitem{3gpp-4g} 3GPP TS 23.401, "General Packet Radio Service (GPRS) enhancements for Evolved Universal Terrestrial Radio Access Network (E-UTRAN) access," v16.0.0, 2020.
+
+\bibitem{3gpp-5g} 3GPP TS 23.501, "System Architecture for the 5G System," v16.14.0, 2021.
+
+\bibitem{open5gs-docs} Open5GS Documentation, "Open5GS EPC/5GC Implementation," \url{https://open5gs.org/open5gs/docs/}, accessed December 2025.
+
+\bibitem{srsran-docs} Software Radio Systems, "srsRAN Project Documentation," \url{https://docs.srsran.com/}, accessed December 2025.
+
+\bibitem{ueransim-docs} ALPETTE, "UERANSIM 5G UE/gNB Simulator," \url{https://github.com/aligungr/UERANSIM}, accessed December 2025.
+
+\bibitem{prometheus-docs} Prometheus Authors, "Prometheus Monitoring System," \url{https://prometheus.io/docs/}, accessed December 2025.
+
+\bibitem{grafana-docs} Grafana Labs, "Grafana Visualization Platform," \url{https://grafana.com/docs/}, accessed December 2025.
+
+\bibitem{terraform-docs} HashiCorp, "Terraform Infrastructure as Code," \url{https://www.terraform.io/docs}, accessed December 2025.
+
+\bibitem{ansible-docs} Red Hat, "Ansible Automation Platform," \url{https://docs.ansible.com/}, accessed December 2025.
+
+\bibitem{gcp-docs} Google Cloud, "Google Cloud Platform Documentation," \url{https://cloud.google.com/docs}, accessed December 2025.
+
+\bibitem{mongodb-docs} MongoDB Inc., "MongoDB Database Documentation," \url{https://docs.mongodb.com/}, accessed December 2025.
+
+\bibitem{nginx-docs} NGINX Inc., "NGINX Documentation," \url{https://nginx.org/en/docs/}, accessed December 2025.
+
+\bibitem{devops-culture} Kim, Gene, et al. "The DevOps Handbook: How to Create World-Class Agility, Reliability, and Security in Technology Organizations." IT Revolution Press, 2016.
+
+\bibitem{cloud-native} Newman, Sam. "Building Microservices: Designing Fine-Grained Systems." O'Reilly Media, 2015.
+
+\bibitem{5g-architecture} Dahlman, Erik, et al. "5G NR: The Next Generation Wireless Access Technology." Academic Press, 2018.
+
+\bibitem{network-slicing} Foukas, Xenofon, et al. "Network Slicing in 5G: Survey and Challenges." IEEE Communications Magazine, vol. 55, no. 5, 2017, pp. 94-100.
+
+\bibitem{service-mesh} Li, Wenqing, et al. "Service Mesh: Challenges, State of the Art, and Future Research Opportunities." IEEE Transactions on Services Computing, 2021.
+
+\bibitem{edge-computing} Shi, Weisong, et al. "Edge Computing: Vision and Challenges." IEEE Internet of Things Journal, vol. 3, no. 5, 2016, pp. 637-646.
+
+\bibitem{ai-networking} Mao, Qian, et al. "A Survey on Mobile Edge Computing: The Communication Perspective." IEEE Communications Surveys \& Tutorials, vol. 19, no. 4, 2017, pp. 2322-2358.
+
+\bibitem{quantum-crypto} Bernstein, Daniel J., et al. "Post-Quantum Cryptography." Springer, 2009.
+
+\bibitem{zero-trust} Rose, Scott W., et al. "Zero Trust Architecture." NIST Special Publication 800-207, 2020.
+
+\bibitem{chaos-engineering} Basiri, Ali, et al. "Chaos Engineering." IEEE Software, vol. 38, no. 3, 2021, pp. 35-41.
+
+\bibitem{gitops} Weaveworks, "GitOps: Operations by Pull Request," \url{https://www.weave.works/technologies/gitops/}, accessed December 2025.
+
+\bibitem{istio-docs} Istio Authors, "Istio Service Mesh," \url{https://istio.io/latest/docs/}, accessed December 2025.
+
+\bibitem{kubernetes-docs} Kubernetes Authors, "Kubernetes Documentation," \url{https://kubernetes.io/docs/}, accessed December 2025.
+
+\bibitem{helm-docs} Helm Authors, "Helm Package Manager," \url{https://helm.sh/docs/}, accessed December 2025.
+
+\bibitem{jaeger-docs} Jaeger Authors, "Jaeger Distributed Tracing," \url{https://www.jaegertracing.io/docs/}, accessed December 2025.
+
+\bibitem{elk-stack} Elasticsearch B.V., "ELK Stack Documentation," \url{https://www.elastic.co/guide/index.html}, accessed December 2025.
+
+\bibitem{oauth2-spec} Hardt, Dick, Ed. "The OAuth 2.0 Authorization Framework." RFC 6749, 2012.
+
+\bibitem{jwt-spec} Jones, Michael, et al. "JSON Web Token (JWT)." RFC 7519, 2015.
+
+\bibitem{redis-docs} Redis Labs, "Redis Documentation," \url{https://redis.io/documentation}, accessed December 2025.
+
+\bibitem{vault-docs} HashiCorp, "Vault Secrets Management," \url{https://www.vaultproject.io/docs}, accessed December 2025.
+
+\bibitem{terraform-testing} HashiCorp, "Terratest: Terraform Testing Framework," \url{https://terratest.gruntwork.io/}, accessed December 2025.
+
+\bibitem{serverless-functions} AWS, "AWS Lambda Documentation," \url{https://docs.aws.amazon.com/lambda/}, accessed December 2025.
+
+\bibitem{auto-scaling} Google Cloud, "Compute Engine Autoscaling," \url{https://cloud.google.com/compute/docs/autoscaler}, accessed December 2025.
+
+\bibitem{multi-cloud} VMware, "Multi-Cloud Strategy Guide," \url{https://www.vmware.com/topics/glossary/content/multi-cloud}, accessed December 2025.
+
+\end{thebibliography}
+
+\end{document}
