@@ -19,7 +19,7 @@
 \usepackage{amsfonts}
 \usepackage{amssymb}
 \usepackage{url}
-\usepackage{cite}
+\usepackage[superscript]{cite}
 
 % --- Couleurs pour le code ---
 \definecolor{codegreen}{rgb}{0,0.6,0}
@@ -65,37 +65,37 @@
 % --- Page de titre ---
 \begin{titlepage}
     \centering
-    \vspace*{1cm}
+    \vspace*{2cm}
     
     % --- Titres ---
-    {\Huge\bfseries Automatisation du Cycle de Vie des Réseaux 4G et 5G \par}
+    {\Huge\bfseries Analyse Comparative et Automatisation DevOps des Cores 4G et 5G vers le Cloud-Native \par}
     \vspace{1cm}
-    {\Large\bfseries Migration Infrastructurelle Multi-Instance sous Open5GS via l'Orchestration DevOps sur GCP\par}
-    \vspace{2cm}
+    {\Large\bfseries Migration Infrastructurelle Multi-Instance, Orchestration et Monitoring sous Open5GS sur Google Cloud Platform\par}
+    \vspace{3cm}
     
     % --- Informations ---
     {\Large Auteurs :\par}
     \vspace{0.3cm}
-    {\large Youssef El Kahlaoui\par}
-    {\large Ayoub Gorry\par}
-    {\large Anass Essafi\par}
+    {\large Anass Essafi~\cite{essafi}\par}
+    {\large Ayoub Gorry~\cite{gorry}\par}
+    {\large Youssef El Kahlaoui~\cite{elkahlaoui}\par}
+
     \vspace{1cm}
     
     {\Large Institution :\par}
     \vspace{0.3cm}
     {\large École Nationale des Sciences Appliquées (ENSA) - Al Hoceima\par}
-    {\large Département IA et Transformation Digitale\par}
+    {\large Transformation Digitale et Intelligence Artificielle \par}
     \vspace{1cm}
     
     {\Large Encadrant :\par}
     \vspace{0.3cm}
-    {\large Pr A. Bahri\par}
-    {\large Professeur/chercheur\par}
+    {\large Professeur A. Bahri~\cite{bahri}\par}
     \vspace{1cm}
     
     {\Large Date de soumission :\par}
     \vspace{0.3cm}
-    {\large 25 décembre 2025\par}
+    {\large Décembre 2025\par}
     
     % --- Bloc Résumé (Centré sur la page, mais texte justifié) ---
     \vfill 
@@ -193,7 +193,12 @@ Le réseau core 4G, connu sous le nom d'Evolved Packet Core (EPC), a introduit u
     \item \textbf{Home Subscriber Server (HSS)} : Stocke les informations d'abonnés et les données d'authentification.
     \item \textbf{Policy and Charging Rules Function (PCRF)} : Gère les règles de politique et de facturation.
 \end{itemize}
-
+\begin{figure}
+    \centering
+    \includegraphics[width=0.80\linewidth]{WhatsApp Image 2025-12-26 at 2.57.35 PM (1).jpeg}
+    \caption{Schéma détaillé de l’architecture Open5GS 4G EPC}
+    \label{fig:placeholder}
+\end{figure}
 \subsection{Caractéristiques Clés de la 4G}
 
 \begin{table}[H]
@@ -577,7 +582,7 @@ Le Réseau Core 5G (5GC) introduit une architecture basée sur des services (SBA
 \begin{figure}
     \centering
     \includegraphics[width=0.8\linewidth]{Experimental-5G-environment-of-a-5G-mobile-network-UERANSIM-Open5GS.png}
-    \caption{Schéma détaillé de l'architecture Open5GS sur GCP} % Ce titre va dans la Liste des Figures
+    \caption{Schéma détaillé de l'architecture Open5GS 5G Core} % Ce titre va dans la Liste des Figures
     \label{fig:placeholder}
 \end{figure}
     \item \textbf{AMF (Access and Mobility Management Function)} : Gère l'accès et la mobilité des terminaux.
@@ -1252,6 +1257,15 @@ ExecStart=/usr/local/bin/prometheus \
 WantedBy=multi-user.target
 \end{lstlisting}
 
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{Untitled design.png}
+    \caption{Architecture Finale de VPC et relations entre service}
+    \label{fig:placeholder}
+\end{figure}
+
+
+
 \section{Implémentation de la sécurité de la passerelle API}
 
 \subsection{Configuration de l'authentification}
@@ -1286,7 +1300,12 @@ location /amf {
     proxy_pass http://10.10.0.20:7777;
 }
 \end{lstlisting}
-
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{image.png}
+    \caption{Architecture explicative du rôle de reverse proxy Nginx}
+    \label{fig:placeholder}
+\end{figure}
 \subsection{Procédures de test de sécurité}
 
 Une validation de sécurité compléte garantit l'efficacité de la passerelle APIé:
@@ -2359,6 +2378,17 @@ Recommandations pratiques de mise en éuvre :
 
 % Références
 \begin{thebibliography}{99}
+
+% Auteurs et Encadrant (insérés en tête de bibliographie)
+
+\bibitem{essafi} Anass Essafi. Auteur — Étudiant en Transformation Digitale et Intelligence Artificielle, École Nationale des Sciences Appliquées (ENSA) - Al Hoceima.
+
+\bibitem{gorry} Ayoub Gorry. Auteur — Étudiant en Transformation Digitale et Intelligence Artificielle, École Nationale des Sciences Appliquées (ENSA) - Al Hoceima.
+
+\bibitem{elkahlaoui} Youssef El Kahlaoui. Auteur — Étudiant en Transformation Digitale et Intelligence Artificielle, École Nationale des Sciences Appliquées (ENSA) - Al Hoceima. Portfolio:
+\url{https://youssef-elkahlaoui.rf.gd/}.
+\bibitem{bahri} Professeur Abdelkhalek BAHRI . Encadrant — Professeur, École Nationale des Sciences Appliquées (ENSA) - Al Hoceima.
+
 
 \bibitem{3gpp-4g} 3GPP TS 23.401, "General Packet Radio Service (GPRS) enhancements for Evolved Universal Terrestrial Radio Access Network (E-UTRAN) access," v16.0.0, 2020.
 
