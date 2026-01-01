@@ -2,6 +2,7 @@
 
 ## 3-VM Architecture: Isolated 4G, 5G, and Centralized Monitoring
 
+
 **Project Status:** Production-Ready | 60-90 minutes (full deployment) | ~$20/month  
 **Cloud Provider:** Google Cloud Platform (GCP)  
 **Region:** us-central1-a  
